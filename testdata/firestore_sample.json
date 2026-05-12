@@ -1,0 +1,169 @@
+{
+  "users": {
+    "test-user-001": {
+      "userId": "test-user-001",
+      "displayName": "John Doe",
+      "email": "john.doe@example.com",
+      "createdAt": "2024-01-15T10:30:00Z",
+
+      "messages": {
+        "email-001": {
+          "email": {
+            "id": "email-001",
+            "from": "alice@example.com",
+            "to": "john.doe@example.com",
+            "cc": "",
+            "bcc": "",
+            "subject": "Meeting Tomorrow",
+            "content": "Hi John,\n\nJust a reminder about our meeting tomorrow at 2 PM.\n\nPlease review the attached agenda beforehand.\n\nBest regards,\nAlice",
+            "dateTime": "2024-02-20T14:00:00Z",
+            "status": "sent",
+            "folderId": "folder-001"
+          },
+          "attachments": [
+            {
+              "id": "attach-001",
+              "name": "agenda.pdf",
+              "type": "application/pdf",
+              "dataBase64": "JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwo+PgplbmRvYmoKdHJhaWxlcgo8PAovUm9vdCAxIDAgUgo+PgolJUVPRgo="
+            }
+          ]
+        },
+        "email-002": {
+          "email": {
+            "id": "email-002",
+            "from": "john.doe@example.com",
+            "to": "bob@example.com",
+            "cc": "carol@example.com",
+            "bcc": "",
+            "subject": "Project Update - Q1 2024",
+            "content": "Hi Bob,\n\nHere's the Q1 project update as discussed.\n\nKey highlights:\n- Phase 1 completed on schedule\n- Budget is tracking at 95%\n- Next milestone: March 15th\n\nLet me know if you have questions.\n\nJohn",
+            "dateTime": "2024-02-19T09:30:00Z",
+            "status": "sent",
+            "folderId": "folder-001"
+          },
+          "attachments": []
+        },
+        "email-003": {
+          "email": {
+            "id": "email-003",
+            "from": "carol@example.com",
+            "to": "john.doe@example.com",
+            "cc": "",
+            "bcc": "",
+            "subject": "Weekend Plans",
+            "content": "Hey John!\n\nAre you free this weekend? We're thinking of organizing a hiking trip to the mountains.\n\nLet me know!\n\nCarol",
+            "dateTime": "2024-02-18T16:45:00Z",
+            "status": "sent",
+            "folderId": "folder-002"
+          },
+          "attachments": [
+            {
+              "id": "attach-002",
+              "name": "trail_map.png",
+              "type": "image/png",
+              "dataBase64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            }
+          ]
+        },
+        "email-004": {
+          "email": {
+            "id": "email-004",
+            "from": "john.doe@example.com",
+            "to": "support@techcorp.com",
+            "cc": "",
+            "bcc": "",
+            "subject": "Software License Renewal",
+            "content": "Dear Support,\n\nI would like to inquire about renewing our enterprise software license.\n\nCurrent license ID: ENT-2023-4567\nExpiration date: March 31, 2024\n\nPlease provide renewal options and pricing.\n\nThank you,\nJohn Doe",
+            "dateTime": "2024-02-17T11:20:00Z",
+            "status": "draft",
+            "folderId": null
+          },
+          "attachments": []
+        },
+        "email-005": {
+          "email": {
+            "id": "email-005",
+            "from": "newsletter@techweekly.com",
+            "to": "john.doe@example.com",
+            "cc": "",
+            "bcc": "",
+            "subject": "This Week in Tech - Issue #42",
+            "content": "Welcome to This Week in Tech!\n\n## Top Stories\n\n1. AI breakthroughs in natural language processing\n2. New smartphone releases announced\n3. Cybersecurity trends for 2024\n\nRead more at techweekly.com\n\nUnsubscribe: techweekly.com/unsubscribe",
+            "dateTime": "2024-02-16T08:00:00Z",
+            "status": "sent",
+            "folderId": "folder-003"
+          },
+          "attachments": [
+            {
+              "id": "attach-003",
+              "name": "newsletter.html",
+              "type": "text/html",
+              "dataBase64": "PCFET0NUWVBFIGh0bWw+PGh0bWw+PGJvZHk+PGgxPk5ld3NsZXR0ZXI8L2gxPjwvYm9keT48L2h0bWw+"
+            },
+            {
+              "id": "attach-004",
+              "name": "banner.jpg",
+              "type": "image/jpeg",
+              "dataBase64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AVN//2Q=="
+            }
+          ]
+        }
+      },
+
+      "contacts": {
+        "contact-001": {
+          "id": "contact-001",
+          "name": "Alice Smith",
+          "email": "alice@example.com",
+          "createdAt": "2024-01-20T09:00:00Z"
+        },
+        "contact-002": {
+          "id": "contact-002",
+          "name": "Bob Johnson",
+          "email": "bob@example.com",
+          "createdAt": "2024-01-21T10:30:00Z"
+        },
+        "contact-003": {
+          "id": "contact-003",
+          "name": "Carol Williams",
+          "email": "carol@example.com",
+          "createdAt": "2024-01-22T14:15:00Z"
+        },
+        "contact-004": {
+          "id": "contact-004",
+          "name": "Tech Corp Support",
+          "email": "support@techcorp.com",
+          "createdAt": "2024-01-25T11:00:00Z"
+        },
+        "contact-005": {
+          "id": "contact-005",
+          "name": "Tech Weekly Newsletter",
+          "email": "newsletter@techweekly.com",
+          "createdAt": "2024-02-01T08:00:00Z"
+        }
+      },
+
+      "folders": {
+        "folder-001": {
+          "id": "folder-001",
+          "name": "Work",
+          "parentId": null,
+          "createdAt": "2024-01-16T08:00:00Z"
+        },
+        "folder-002": {
+          "id": "folder-002",
+          "name": "Personal",
+          "parentId": null,
+          "createdAt": "2024-01-16T08:05:00Z"
+        },
+        "folder-003": {
+          "id": "folder-003",
+          "name": "Newsletters",
+          "parentId": "folder-001",
+          "createdAt": "2024-01-17T09:30:00Z"
+        }
+      }
+    }
+  }
+}

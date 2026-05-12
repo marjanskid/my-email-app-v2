@@ -1,1 +1,1 @@
-# my-email-app-v2
+# MyEmailApp

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "845986985064",
+    "project_id": "my-email-app-172d3",
+    "storage_bucket": "my-email-app-172d3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:845986985064:android:7e0b309b7133da774cf7dd",
+        "android_client_info": {
+          "package_name": "com.example.myemailapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoEYdm13SXR4vs31rNzCDmx07Bq4GGATo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
