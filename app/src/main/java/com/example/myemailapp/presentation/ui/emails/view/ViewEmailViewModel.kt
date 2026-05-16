@@ -156,7 +156,7 @@ class ViewEmailViewModel(
         _state.update { it.copy(processState = ProcessState.Loading) }
 
         viewModelScope.launch(Dispatchers.IO) {
-            emailRepository.deleteEmail(emailId).fold(
+            emailRepository.softDeleteEmail(emailId).fold(
                 onSuccess = {
                     withContext(Dispatchers.Main) {
                         _state.update { it.copy(
@@ -336,7 +336,7 @@ class ViewEmailViewModel(
                     } ?: run {
                         failedAttachments.add(attachment.name)
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     failedAttachments.add(attachment.name)
                 }
             }

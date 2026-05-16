@@ -1,4 +1,4 @@
-package com.example.myemailapp.presentation.ui.folders.create_new
+package com.example.myemailapp.presentation.ui.folders.edit
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,12 +32,12 @@ import com.example.myemailapp.domain.model.isSuccess
 import com.example.myemailapp.presentation.ui.common.LoadingView
 import com.example.myemailapp.presentation.ui.common.toolbar.CustomToolbar
 import kotlinx.coroutines.launch
-import org.koin.compose.viewmodel.koinViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @Composable
-fun CreateFolderScreen(
+fun EditFolderScreen(
     navController: NavController,
-    viewModel: CreateFolderViewModel = koinViewModel()
+    viewModel: EditFolderViewModel = koinViewModel()
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -71,17 +71,17 @@ fun CreateFolderScreen(
             },
             topBar = {
                 CustomToolbar(
-                    title = "Create new folder",
+                    title = "Edit folder",
                     onNavigationIconPressed = navController::popBackStack,
                     actions = {
-                        Row {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(
                                 onClick = navController::popBackStack
                             ) {
                                 Text("Cancel")
                             }
                             TextButton(
-                                onClick = viewModel::createFolder
+                                onClick = viewModel::saveFolder
                             ) {
                                 Text("Save")
                             }
@@ -102,7 +102,7 @@ fun CreateFolderScreen(
                     value = state.name,
                     onValueChange = viewModel::updateFolderName,
                     label = { Text("Name") },
-                    placeholder = { Text("New folder name") },
+                    placeholder = { Text("Folder name") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )

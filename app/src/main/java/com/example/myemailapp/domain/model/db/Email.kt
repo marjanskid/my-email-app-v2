@@ -34,7 +34,8 @@ data class Email(
     val folderId: String? = null,
     val tags: List<Tag> = emptyList(),
     val isRead: Boolean = false,
-    val isStarred: Boolean = false
+    val isStarred: Boolean = false,
+    val isDeleted: Boolean = false
 ) : Parcelable {
     companion object {
         fun toEmail(

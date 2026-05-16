@@ -45,6 +45,7 @@ import com.example.myemailapp.presentation.extension.NavControllerExtensions.rep
 import com.example.myemailapp.domain.model.EmailResult
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.domain.model.db.Email
+import com.example.myemailapp.presentation.ui.common.LoadingView
 import com.example.myemailapp.presentation.model.Screen
 import com.example.myemailapp.presentation.ui.common.drawer.CustomNavigationDrawer
 import com.example.myemailapp.presentation.ui.common.toolbar.CustomToolbar
@@ -198,12 +199,7 @@ fun EmailsScreen(
                         when {
                             state.processState == ProcessState.Loading && state.emails.isEmpty() && !state.isRefreshing -> {
                                 // Initial loading state - only show on first load, not during pull-to-refresh
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator()
-                                }
+                                LoadingView()
                             }
                             state.emails.isEmpty() -> {
                                 // Empty state - no emails at all

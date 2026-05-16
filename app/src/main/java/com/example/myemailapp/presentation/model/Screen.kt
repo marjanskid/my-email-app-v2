@@ -30,5 +30,11 @@ sealed class Screen(val route: String) {
         }
     }
     object CreateFolder: Screen("create-folder-screen")
+    object ViewFolder : Screen("view-folder-screen/{folderId}") {
+        fun createRoute(folderId: String) = "view-folder-screen/$folderId"
+    }
+    object EditFolder : Screen("edit-folder-screen/{folderId}") {
+        fun createRoute(folderId: String) = "edit-folder-screen/$folderId"
+    }
     object TestData: Screen("test-data-screen")
 }
