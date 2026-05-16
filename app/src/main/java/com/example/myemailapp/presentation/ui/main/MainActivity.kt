@@ -23,6 +23,8 @@ import com.example.myemailapp.presentation.ui.emails.EmailsScreen
 import com.example.myemailapp.presentation.ui.emails.create.CreateEmailScreen
 import com.example.myemailapp.presentation.ui.emails.view.ViewEmailScreen
 import com.example.myemailapp.presentation.ui.folders.create_new.CreateFolderScreen
+import com.example.myemailapp.presentation.ui.folders.edit.EditFolderScreen
+import com.example.myemailapp.presentation.ui.folders.view.ViewFolderScreen
 import com.example.myemailapp.presentation.ui.login.LoginScreen
 import com.example.myemailapp.presentation.ui.profile.ProfileScreen
 import com.example.myemailapp.presentation.ui.testdata.TestDataScreen
@@ -121,6 +123,22 @@ class MainActivity : ComponentActivity() {
                             route = Screen.CreateFolder.route,
                         ) {
                             CreateFolderScreen(navController = navController)
+                        }
+                        composable(
+                            route = Screen.ViewFolder.route,
+                            arguments = listOf(navArgument("folderId") { type = NavType.StringType })
+                        ) { _ ->
+                            ViewFolderScreen(
+                                navController = navController
+                            )
+                        }
+                        composable(
+                            route = Screen.EditFolder.route,
+                            arguments = listOf(navArgument("folderId") { type = NavType.StringType })
+                        ) { _ ->
+                            EditFolderScreen(
+                                navController = navController
+                            )
                         }
                         composable(
                             route = Screen.TestData.route,

@@ -1,6 +1,5 @@
 package com.example.myemailapp.presentation.ui.folders.view_all
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,9 +25,9 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -37,9 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.example.myemailapp.presentation.extension.NavControllerExtensions.replaceCurrentRoute
-import com.example.myemailapp.domain.model.Folder
+import com.example.myemailapp.domain.model.FolderWithCount
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.presentation.model.Screen
+import com.example.myemailapp.presentation.ui.common.LoadingView
 import com.example.myemailapp.presentation.ui.common.drawer.CustomNavigationDrawer
 import com.example.myemailapp.presentation.ui.common.toolbar.CustomToolbar
 import com.example.myemailapp.presentation.ui.common.drawer.emailsScreenDrawerItems
@@ -56,6 +55,10 @@ fun FoldersScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val keyboardController = LocalSoftwareKeyboardController.current
     val state = viewModel.state.collectAsStateWithLifecycle().value
+
+    LaunchedEffect(Unit) {
+        viewModel.getFolders()
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         CustomNavigationDrawer(
@@ -112,8 +115,13 @@ fun FoldersScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(state.folders) { folder ->
-                            FolderItemCard(folder = folder, onClick = {})
+                        items(state.folders) { folderWithCount ->
+                            FolderItemCard(
+                                folderWithCount = folderWithCount,
+                                onClick = {
+                                    navController.navigate(Screen.ViewFolder.createRoute(folderWithCount.folder.id))
+                                }
+                            )
                         }
                     }
                 }
@@ -121,33 +129,24 @@ fun FoldersScreen(
         )
 
         if (state.processState == ProcessState.Loading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f))
-                    .clickable(enabled = false) { },
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
+            LoadingView()
         }
     }
 }
 
 @Composable
-fun FolderItemCard(folder: Folder, onClick: (Folder) -> Unit) {
+fun FolderItemCard(folderWithCount: FolderWithCount, onClick: () -> Unit) {
     Card(
-        onClick = { onClick(folder) },
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = folder.name,
+                text = folderWithCount.folder.name,
                 style = MaterialTheme.typography.headlineSmall
             )
             Text(
-//                text = "Total messages: ${folder.messageIds.count()}",
-                text = "Total messages: 34", // Hardcoded at the moment
+                text = "Total messages: ${folderWithCount.messageCount}",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
