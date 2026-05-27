@@ -6,6 +6,7 @@ import com.example.myemailapp.data.mapper.toDomain
 import com.example.myemailapp.data.mapper.toDto
 import com.example.myemailapp.data.model.EmailDocumentDto
 import com.example.myemailapp.data.model.EmailMetadataDto
+import com.example.myemailapp.data.service.RuleProcessingService
 import com.example.myemailapp.domain.exception.EmailException
 import com.example.myemailapp.domain.model.Tag
 import com.example.myemailapp.domain.model.db.Email
@@ -21,11 +22,14 @@ import kotlin.coroutines.cancellation.CancellationException
 
 class EmailRepositoryImpl(
     private val auth: FirebaseAuth,
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    private val rulesRepository: RulesRepository,
+    private val ruleProcessingService: RuleProcessingService
 ) : EmailRepository {
 
     companion object {
         private const val TRASH_FOLDER_ID = "folder-trash"
+        private const val SENT_FOLDER_ID = "folder-sent"
     }
 
     private val currentUserEmail: String
@@ -35,11 +39,6 @@ class EmailRepositoryImpl(
     private val currentUserId: String
         get() = auth.currentUser?.uid
             ?: throw EmailException.NotAuthenticated()
-
-    private fun userMessagesCollection() =
-        db.collection(Collections.USERS)
-            .document(currentUserId)
-            .collection(Collections.MESSAGES)
 
     private fun allMessagesCollection() =
         db.collection(Collections.ALL_MESSAGES)
@@ -67,8 +66,9 @@ class EmailRepositoryImpl(
 
             val attachmentDtos = email.attachments.map { it.toDto() }
 
-            // Build recipients array from to, cc, bcc (lowercase for case-insensitive matching)
+            // Build recipients array from sender + to, cc, bcc (lowercase for case-insensitive matching)
             val recipients = buildList {
+                currentUserEmail.trim().lowercase().takeIf { it.isNotEmpty() }?.let { add(it) }
                 email.to.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
                 email.cc.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
                 email.bcc.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
@@ -81,17 +81,26 @@ class EmailRepositoryImpl(
                 "recipients" to recipients
             )
 
-            // Write to user's messages collection (backward compatibility)
-            userMessagesCollection()
-                .document(emailId)
-                .set(firestoreData)
-                .await()
-
-            // Also write to allMessages collection for querying received emails
+            // Write to allMessages collection (single source of truth)
             allMessagesCollection()
                 .document(emailId)
                 .set(firestoreData)
                 .await()
+
+            // Create metadata for sender so email appears in Sent folder
+            if (status == EmailStatus.sent) {
+                val senderMetadata = EmailMetadataDto(
+                    tags = emptyList(),
+                    isRead = true,
+                    isStarred = false,
+                    folderId = SENT_FOLDER_ID,
+                    isDeleted = false
+                )
+                userEmailMetadataCollection()
+                    .document(emailId)
+                    .set(senderMetadata)
+                    .await()
+            }
 
             Result.success(emailId)
         } catch (e: CancellationException) {
@@ -103,19 +112,11 @@ class EmailRepositoryImpl(
 
     override suspend fun getEmailById(emailId: String): Result<Email> {
         return try {
-            // First try allMessages collection (for received emails)
-            var document = allMessagesCollection()
+            // allMessages is the single source of truth for email content
+            val document = allMessagesCollection()
                 .document(emailId)
                 .get()
                 .await()
-
-            // Fallback to user's messages if not found in allMessages
-            if (!document.exists()) {
-                document = userMessagesCollection()
-                    .document(emailId)
-                    .get()
-                    .await()
-            }
 
             if (!document.exists()) {
                 return Result.failure(EmailException.NotFound(emailId))
@@ -150,12 +151,7 @@ class EmailRepositoryImpl(
 
     override suspend fun deleteEmail(emailId: String): Result<Unit> {
         return try {
-            userMessagesCollection()
-                .document(emailId)
-                .delete()
-                .await()
-
-            // Also delete metadata if exists
+            // Delete metadata - soft delete via metadata is sufficient
             userEmailMetadataCollection()
                 .document(emailId)
                 .delete()
@@ -204,7 +200,27 @@ class EmailRepositoryImpl(
                 return Result.failure(metadataResult.exceptionOrNull()
                     ?: Exception("Failed to fetch email metadata"))
             }
-            val metadataMap = metadataResult.getOrNull() ?: emptyMap()
+            val metadataMap = (metadataResult.getOrNull() ?: emptyMap()).toMutableMap()
+
+            // Apply rules to new emails (those without metadata)
+            val newEmailIds = emailIds.filter { it !in metadataMap.keys }
+            if (newEmailIds.isNotEmpty()) {
+                val rules = rulesRepository.getRules().getOrNull() ?: emptyList()
+                if (rules.isNotEmpty()) {
+                    val emailDocsMap = querySnapshot.documents.associate { doc ->
+                        doc.id to doc.toObject<EmailDocumentDto>()
+                    }
+                    newEmailIds.forEach { emailId ->
+                        val emailDoc = emailDocsMap[emailId] ?: return@forEach
+                        val metadata = ruleProcessingService.applyRulesToNewEmail(emailDoc, rules)
+                        if (metadata != null) {
+                            // Save metadata to Firestore
+                            userEmailMetadataCollection().document(emailId).set(metadata).await()
+                            metadataMap[emailId] = metadata
+                        }
+                    }
+                }
+            }
 
             val emails = querySnapshot.documents.mapNotNull { document ->
                 val emailDoc = document.toObject<EmailDocumentDto>() ?: return@mapNotNull null

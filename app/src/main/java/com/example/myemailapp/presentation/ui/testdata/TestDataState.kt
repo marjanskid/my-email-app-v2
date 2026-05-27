@@ -2,8 +2,7 @@ package com.example.myemailapp.presentation.ui.testdata
 
 data class TestDataState(
     val seedingState: SeedingState = SeedingState.Idle,
-    val clearingState: ClearingState = ClearingState.Idle,
-    val testEmailId: String = ""
+    val clearingState: ClearingState = ClearingState.Idle
 )
 
 sealed class SeedingState {
