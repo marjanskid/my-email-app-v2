@@ -13,7 +13,9 @@ fun EmailDto.toDomain(
     attachments: List<Attachment>,
     tags: List<Tag> = emptyList(),
     isRead: Boolean = false,
-    isStarred: Boolean = false
+    isStarred: Boolean = false,
+    isDeleted: Boolean = false,
+    metadataFolderId: String? = null
 ): Email = Email(
     id = id,
     from = from,
@@ -25,10 +27,11 @@ fun EmailDto.toDomain(
     attachments = attachments,
     dateTime = dateTime?.toDate()?.toInstant() ?: Instant.now(),
     status = status,
-    folderId = folderId,
+    folderId = metadataFolderId ?: folderId,
     tags = tags,
     isRead = isRead,
-    isStarred = isStarred
+    isStarred = isStarred,
+    isDeleted = isDeleted
 )
 
 fun Email.toDto(): EmailDto = EmailDto(

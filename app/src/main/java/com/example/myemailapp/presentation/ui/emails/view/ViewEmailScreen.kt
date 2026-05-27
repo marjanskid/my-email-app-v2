@@ -3,7 +3,6 @@ package com.example.myemailapp.presentation.ui.emails.view
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -36,6 +35,7 @@ import com.example.myemailapp.domain.model.EmailResult
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.presentation.model.Screen
 import com.example.myemailapp.domain.model.db.Email
+import com.example.myemailapp.presentation.ui.common.LoadingView
 import com.example.myemailapp.presentation.ui.common.toolbar.CustomToolbar
 import com.example.myemailapp.presentation.ui.common.toolbar.ViewEmailToolbarActions
 import com.example.myemailapp.presentation.ui.emails.create.AttachmentPreviewItem
@@ -196,14 +196,7 @@ fun ViewEmailScreen(
     ) { innerPadding ->
         when {
             state.processState == ProcessState.Loading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                LoadingView()
             }
 
             state.email != null -> {

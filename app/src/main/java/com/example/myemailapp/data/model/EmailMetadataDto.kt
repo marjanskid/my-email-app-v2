@@ -7,5 +7,8 @@ data class EmailMetadataDto(
     @get:PropertyName("isRead") @set:PropertyName("isRead")
     var isRead: Boolean = false,
     @get:PropertyName("isStarred") @set:PropertyName("isStarred")
-    var isStarred: Boolean = false
+    var isStarred: Boolean = false,
+    val folderId: String? = null,
+    @get:PropertyName("isDeleted") @set:PropertyName("isDeleted")
+    var isDeleted: Boolean = false
 )

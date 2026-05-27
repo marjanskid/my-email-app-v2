@@ -12,6 +12,7 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.toObject
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 
 class FoldersRepositoryImpl(
     private val auth: FirebaseAuth,
@@ -38,6 +39,8 @@ class FoldersRepositoryImpl(
                 doc.toObject<FolderDto>().toDomain()
             }
             Result.success(folders)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -54,6 +57,8 @@ class FoldersRepositoryImpl(
                 .await()
 
             Result.success(folderId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -69,6 +74,8 @@ class FoldersRepositoryImpl(
                 .await()
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -82,6 +89,8 @@ class FoldersRepositoryImpl(
                 .await()
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -102,6 +111,8 @@ class FoldersRepositoryImpl(
                 ?: return Result.failure(IllegalStateException("Failed to parse folder"))
 
             Result.success(folderDto.toDomain())
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -119,6 +130,8 @@ class FoldersRepositoryImpl(
                 doc.toObject<FolderDto>().toDomain()
             }
             Result.success(folders)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

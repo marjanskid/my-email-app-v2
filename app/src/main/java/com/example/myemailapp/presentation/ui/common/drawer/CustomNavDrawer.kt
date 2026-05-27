@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.myemailapp.presentation.model.NavDrawerItem
-import com.example.myemailapp.presentation.model.Screen
 import com.example.myemailapp.ui.theme.MyEmailAppTheme
 import kotlinx.coroutines.launch
 
@@ -49,10 +48,6 @@ fun CustomNavigationDrawer(
                         label = { Text(text = item.title) },
                         selected = index == selectedItemIndex.intValue,
                         onClick = {
-                            if (selectedItemIndex.intValue == index) {
-                                return@NavigationDrawerItem
-                            }
-
                             selectedItemIndex.intValue = index
                             scope.launch {
                                 drawerState.close()

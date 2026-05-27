@@ -10,16 +10,20 @@ import com.example.myemailapp.data.repository.UserRepository
 import com.example.myemailapp.data.repository.UserRepositoryImpl
 import com.example.myemailapp.data.service.CreateFolderStatusService
 import com.example.myemailapp.data.service.EmailStatusService
+import com.example.myemailapp.data.service.UpdateFolderStatusService
 import com.example.myemailapp.data.repository.AuthRepositoryImpl
 import com.example.myemailapp.data.repository.EmailRepositoryImpl
 import com.example.myemailapp.data.service.EmailStatusServiceImpl
 import com.example.myemailapp.data.util.TestDataSeeder
 import com.example.myemailapp.presentation.ui.emails.AttachmentViewModel
 import com.example.myemailapp.domain.service.CreateFolderStatusServiceImpl
+import com.example.myemailapp.domain.service.UpdateFolderStatusServiceImpl
 import com.example.myemailapp.presentation.ui.emails.EmailsViewModel
 import com.example.myemailapp.presentation.ui.emails.create.CreateEmailViewModel
 import com.example.myemailapp.presentation.ui.emails.view.ViewEmailViewModel
 import com.example.myemailapp.presentation.ui.folders.create_new.CreateFolderViewModel
+import com.example.myemailapp.presentation.ui.folders.edit.EditFolderViewModel
+import com.example.myemailapp.presentation.ui.folders.view.ViewFolderViewModel
 import com.example.myemailapp.presentation.ui.folders.view_all.FoldersViewModel
 import com.example.myemailapp.presentation.ui.login.LoginViewModel
 import com.example.myemailapp.presentation.ui.main.MainViewModel
@@ -45,6 +49,7 @@ val appModule = module {
     // Services
     single<EmailStatusService> { EmailStatusServiceImpl() }
     single<CreateFolderStatusService> { CreateFolderStatusServiceImpl() }
+    single<UpdateFolderStatusService> { UpdateFolderStatusServiceImpl() }
 
     // Utilities
     single { TestDataSeeder(firestore = get(), auth = get()) }
@@ -57,7 +62,9 @@ val appModule = module {
     viewModel { CreateEmailViewModel(get(), get(), get()) }
     viewModel { ViewEmailViewModel(get(), get()) }
     viewModel { AttachmentViewModel() }
-    viewModel { FoldersViewModel(get(), get()) }
+    viewModel { FoldersViewModel(get(), get(), get(), get()) }
     viewModel { CreateFolderViewModel(get(), get()) }
+    viewModel { ViewFolderViewModel(get(), get(), get(), get()) }
+    viewModel { EditFolderViewModel(get(), get(), get()) }
     viewModel { TestDataViewModel(get()) }
 }

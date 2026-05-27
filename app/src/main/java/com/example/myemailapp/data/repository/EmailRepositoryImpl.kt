@@ -11,7 +11,6 @@ import com.example.myemailapp.domain.model.Tag
 import com.example.myemailapp.domain.model.db.Email
 import com.example.myemailapp.domain.model.db.EmailStatus
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -24,6 +23,10 @@ class EmailRepositoryImpl(
     private val auth: FirebaseAuth,
     private val db: FirebaseFirestore
 ) : EmailRepository {
+
+    companion object {
+        private const val TRASH_FOLDER_ID = "folder-trash"
+    }
 
     private val currentUserEmail: String
         get() = auth.currentUser?.email
@@ -91,6 +94,8 @@ class EmailRepositoryImpl(
                 .await()
 
             Result.success(emailId)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -131,9 +136,13 @@ class EmailRepositoryImpl(
                 attachments = emailDoc.attachments.map { it.toDomain() },
                 tags = metadata?.tags?.map { it.toDomain() } ?: emptyList(),
                 isRead = metadata?.isRead ?: false,
-                isStarred = metadata?.isStarred ?: false
+                isStarred = metadata?.isStarred ?: false,
+                isDeleted = metadata?.isDeleted ?: false,
+                metadataFolderId = metadata?.folderId
             )
             Result.success(email)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -153,6 +162,8 @@ class EmailRepositoryImpl(
                 .await()
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -204,9 +215,11 @@ class EmailRepositoryImpl(
                     attachments = emailDoc.attachments.map { it.toDomain() },
                     tags = metadata?.tags?.map { it.toDomain() } ?: emptyList(),
                     isRead = metadata?.isRead ?: false,
-                    isStarred = metadata?.isStarred ?: false
+                    isStarred = metadata?.isStarred ?: false,
+                    isDeleted = metadata?.isDeleted ?: false,
+                    metadataFolderId = metadata?.folderId
                 )
-            }
+            }.filter { !it.isDeleted }
 
             // Get the last document ID for cursor-based pagination
             val newLastDocumentId = querySnapshot.documents.lastOrNull()?.id
@@ -254,6 +267,8 @@ class EmailRepositoryImpl(
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -275,6 +290,8 @@ class EmailRepositoryImpl(
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -298,6 +315,8 @@ class EmailRepositoryImpl(
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -321,6 +340,8 @@ class EmailRepositoryImpl(
             }
 
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -362,6 +383,105 @@ class EmailRepositoryImpl(
             }
 
             Result.success(result)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getEmailCountByFolderId(folderId: String): Result<Int> {
+        return try {
+            // Query metadata collection for matching per-user folderId
+            val querySnapshot = userEmailMetadataCollection()
+                .whereEqualTo("folderId", folderId)
+                .get()
+                .await()
+
+            Result.success(querySnapshot.size())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getEmailsByFolderId(folderId: String): Result<List<Email>> {
+        return try {
+            // Step 1: Query metadata collection for emails with matching per-user folderId
+            val metadataSnapshot = userEmailMetadataCollection()
+                .whereEqualTo("folderId", folderId)
+                .get()
+                .await()
+
+            val emailIds = metadataSnapshot.documents.mapNotNull { it.id }
+            if (emailIds.isEmpty()) {
+                return Result.success(emptyList())
+            }
+
+            // Build metadata map from the query results
+            val metadataMap = metadataSnapshot.documents.mapNotNull { doc ->
+                val metadata = doc.toObject<EmailMetadataDto>()
+                if (metadata != null) doc.id to metadata else null
+            }.toMap()
+
+            // Step 2: Fetch emails from allMessages collection
+            // Firestore limits whereIn to 30 items, so we need to batch
+            val emails = mutableListOf<Email>()
+
+            emailIds.chunked(30).forEach { chunk ->
+                val querySnapshot = allMessagesCollection()
+                    .whereIn("email.id", chunk)
+                    .get()
+                    .await()
+
+                querySnapshot.documents.mapNotNull { document ->
+                    val emailDoc = document.toObject<EmailDocumentDto>() ?: return@mapNotNull null
+                    val emailId = document.id
+                    val metadata = metadataMap[emailId]
+
+                    emailDoc.email.toDomain(
+                        attachments = emailDoc.attachments.map { it.toDomain() },
+                        tags = metadata?.tags?.map { it.toDomain() } ?: emptyList(),
+                        isRead = metadata?.isRead ?: false,
+                        isStarred = metadata?.isStarred ?: false,
+                        isDeleted = metadata?.isDeleted ?: false,
+                        metadataFolderId = metadata?.folderId
+                    )
+                }.let { emails.addAll(it) }
+            }
+
+            // Sort by dateTime descending
+            Result.success(emails.sortedByDescending { it.dateTime })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun softDeleteEmail(emailId: String): Result<Unit> {
+        return try {
+            val metadataRef = userEmailMetadataCollection().document(emailId)
+            val currentMetadata = metadataRef.get().await().toObject<EmailMetadataDto>()
+
+            if (currentMetadata != null) {
+                metadataRef.update(
+                    mapOf(
+                        "isDeleted" to true,
+                        "folderId" to TRASH_FOLDER_ID
+                    )
+                ).await()
+            } else {
+                // Create new metadata document with soft-delete flags
+                val newMetadata = EmailMetadataDto(
+                    folderId = TRASH_FOLDER_ID,
+                    isDeleted = true
+                )
+                metadataRef.set(newMetadata).await()
+            }
+
+            Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

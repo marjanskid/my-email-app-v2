@@ -21,11 +21,16 @@ class TestDataSeeder(
         private const val TAG = "TestDataSeeder"
     }
 
-    // Test user email constants
+    // Test user email constants with hardcoded Firebase Auth UIDs
     private object TestUsers {
         const val MILOS = "milos.krstic@myapp.com"
+        const val MILOS_UID = "TDuLwVlceIefe6Sbafr8GtcABRP2"
+
         const val DUSAN = "dusan.m@myemailapp.com"
+        const val DUSAN_UID = "sH5evcNw3ORTtWuWSvaLYpijyAJ3"
+
         const val ARAMBA = "aramba.test@myapp.com"
+        const val ARAMBA_UID = "tg7qIKiopWU0C4H0tDq9dSXCCbr1"
     }
 
     // Predefined tags
@@ -37,6 +42,30 @@ class TestDataSeeder(
         val NEWSLETTER = TagDto("tag-newsletter", "Newsletter", "#9C27B0")
         val FINANCE = TagDto("tag-finance", "Finance", "#009688")
     }
+
+    // Predefined folder IDs for test data
+    private object Folders {
+        const val INBOX = "folder-inbox"
+        const val SENT = "folder-sent"
+        const val SPAM = "folder-spam"
+        const val PROMOTIONS = "folder-promotions"
+        const val TRASH = "folder-trash"
+    }
+
+    // Helper data class for test folder definitions
+    private data class TestFolder(
+        val id: String,
+        val name: String
+    )
+
+    // Test folders to create for each user
+    private val testFolders = listOf(
+        TestFolder(Folders.INBOX, "Inbox"),
+        TestFolder(Folders.SENT, "Sent"),
+        TestFolder(Folders.SPAM, "Spam"),
+        TestFolder(Folders.PROMOTIONS, "Promotions"),
+        TestFolder(Folders.TRASH, "Trash")
+    )
 
     // Helper data class for test email definitions
     private data class TestEmail(
@@ -55,7 +84,9 @@ class TestDataSeeder(
         val emailId: String,
         val isRead: Boolean,
         val isStarred: Boolean,
-        val tags: List<TagDto> = emptyList()
+        val tags: List<TagDto> = emptyList(),
+        val folderId: String? = null,
+        val isDeleted: Boolean = false
     )
 
     private fun buildRecipients(from: String, to: String, cc: String, bcc: String = ""): List<String> {
@@ -69,24 +100,6 @@ class TestDataSeeder(
     }
 
     /**
-     * Query Firestore to find the user ID for a given email address.
-     */
-    private suspend fun getUserIdByEmail(email: String): String? {
-        return try {
-            firestore.collection(Collections.USERS)
-                .whereEqualTo("email", email)
-                .get()
-                .await()
-                .documents
-                .firstOrNull()
-                ?.id
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get user ID for email $email: ${e.message}")
-            null
-        }
-    }
-
-    /**
      * Seeds ALL test data (39 emails + metadata for all 3 users) in one click.
      * Can be run by any authenticated user.
      */
@@ -97,14 +110,14 @@ class TestDataSeeder(
         return try {
             Log.d(TAG, "Starting seedAllTestData - creating 39 test emails for all users")
 
-            // Step 1: Find user IDs for all 3 test users
+            // Step 1: Use hardcoded UIDs for all 3 test users (no Firestore lookup needed)
             val userIds = mapOf(
-                TestUsers.MILOS to getUserIdByEmail(TestUsers.MILOS),
-                TestUsers.DUSAN to getUserIdByEmail(TestUsers.DUSAN),
-                TestUsers.ARAMBA to getUserIdByEmail(TestUsers.ARAMBA)
+                TestUsers.MILOS to TestUsers.MILOS_UID,
+                TestUsers.DUSAN to TestUsers.DUSAN_UID,
+                TestUsers.ARAMBA to TestUsers.ARAMBA_UID
             )
 
-            Log.d(TAG, "Found user IDs: ${userIds.entries.joinToString { "${it.key} -> ${it.value}" }}")
+            Log.d(TAG, "Using hardcoded user IDs: ${userIds.entries.joinToString { "${it.key} -> ${it.value}" }}")
 
             // Step 2: Create all 39 test emails in allMessages collection
             val allMessagesCollection = firestore.collection(Collections.ALL_MESSAGES)
@@ -141,31 +154,51 @@ class TestDataSeeder(
 
             Log.d(TAG, "All ${testEmails.size} test emails created successfully")
 
-            // Step 3: Create metadata for each found user
+            // Step 3: Create folders for each user
             userIds.forEach { (email, userId) ->
-                if (userId != null) {
-                    try {
-                        val metadataList = getMetadataForUser(email)
-                        val metadataCollection = firestore.collection(Collections.USERS)
-                            .document(userId)
-                            .collection(Collections.MESSAGES_METADATA)
+                try {
+                    val foldersCollection = firestore.collection(Collections.USERS)
+                        .document(userId)
+                        .collection(Collections.FOLDERS)
 
-                        metadataList.forEach { metadata ->
-                            val metadataDto = EmailMetadataDto(
-                                tags = metadata.tags,
-                                isRead = metadata.isRead,
-                                isStarred = metadata.isStarred
-                            )
-                            metadataCollection.document(metadata.emailId).set(metadataDto).await()
-                        }
-
-                        Log.d(TAG, "Created ${metadataList.size} metadata entries for $email (userId: $userId)")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to create metadata for $email: ${e.message}", e)
-                        throw e
+                    testFolders.forEach { folder ->
+                        val folderData = mapOf(
+                            "id" to folder.id,
+                            "name" to folder.name
+                        )
+                        foldersCollection.document(folder.id).set(folderData).await()
                     }
-                } else {
-                    Log.w(TAG, "User not found for email: $email - skipping metadata creation")
+
+                    Log.d(TAG, "Created ${testFolders.size} folders for $email (userId: $userId)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to create folders for $email: ${e.message}", e)
+                    throw e
+                }
+            }
+
+            // Step 4: Create metadata for each user
+            userIds.forEach { (email, userId) ->
+                try {
+                    val metadataList = getMetadataForUser(email)
+                    val metadataCollection = firestore.collection(Collections.USERS)
+                        .document(userId)
+                        .collection(Collections.MESSAGES_METADATA)
+
+                    metadataList.forEach { metadata ->
+                        val metadataDto = EmailMetadataDto(
+                            tags = metadata.tags,
+                            isRead = metadata.isRead,
+                            isStarred = metadata.isStarred,
+                            folderId = metadata.folderId,
+                            isDeleted = metadata.isDeleted
+                        )
+                        metadataCollection.document(metadata.emailId).set(metadataDto).await()
+                    }
+
+                    Log.d(TAG, "Created ${metadataList.size} metadata entries for $email (userId: $userId)")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to create metadata for $email: ${e.message}", e)
+                    throw e
                 }
             }
 
@@ -582,150 +615,153 @@ class TestDataSeeder(
     private fun getMetadataForUser(userEmail: String): List<TestMetadata> {
         return when (userEmail.lowercase()) {
             TestUsers.MILOS.lowercase() -> listOf(
-                // MILOS sees 33 emails
+                // MILOS sees 33 emails (Inbox=16, Sent=14, Promotions=1, Spam=1, Trash=1)
                 // NOT visible: test-002 (D→A), test-011 (D→A), test-012 (A→D), test-023 (D→Bob bcc:A), test-029 (D→Bob,Carol bcc:A)
+                // Industry-standard: Sent = user is sender, Inbox = user is recipient (not sender)
                 // Group A (test-001, test-003 only - NOT test-002)
-                TestMetadata("test-001", isRead = true, isStarred = false),
-                TestMetadata("test-003", isRead = false, isStarred = false), // UNREAD
+                TestMetadata("test-001", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D (sent)
+                TestMetadata("test-003", isRead = false, isStarred = false, folderId = Folders.INBOX), // A→M (received) UNREAD
                 // Group B (all 3)
-                TestMetadata("test-004", isRead = true, isStarred = false),
-                TestMetadata("test-005", isRead = true, isStarred = false),
-                TestMetadata("test-006", isRead = true, isStarred = false),
+                TestMetadata("test-004", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D,A (sent)
+                TestMetadata("test-005", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,A (received)
+                TestMetadata("test-006", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
                 // Group C (M↔D and M↔A only - NOT test-011, test-012)
-                TestMetadata("test-007", isRead = true, isStarred = false),
-                TestMetadata("test-008", isRead = true, isStarred = false),
-                TestMetadata("test-009", isRead = true, isStarred = false),
-                TestMetadata("test-010", isRead = true, isStarred = false),
+                TestMetadata("test-007", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D (sent)
+                TestMetadata("test-008", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M (received)
+                TestMetadata("test-009", isRead = true, isStarred = false, folderId = Folders.SENT), // M→A (sent)
+                TestMetadata("test-010", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M (received)
                 // Group D (all 6)
-                TestMetadata("test-013", isRead = true, isStarred = true), // STARRED
-                TestMetadata("test-014", isRead = true, isStarred = false),
-                TestMetadata("test-015", isRead = true, isStarred = false),
-                TestMetadata("test-016", isRead = true, isStarred = false),
-                TestMetadata("test-017", isRead = true, isStarred = false),
-                TestMetadata("test-018", isRead = true, isStarred = false),
+                TestMetadata("test-013", isRead = true, isStarred = true, folderId = Folders.SENT), // M→D cc:A (sent) STARRED
+                TestMetadata("test-014", isRead = true, isStarred = false, folderId = Folders.SENT), // M→A cc:D (sent)
+                TestMetadata("test-015", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
+                TestMetadata("test-016", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A cc:M (received)
+                TestMetadata("test-017", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M cc:D (received)
+                TestMetadata("test-018", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→D cc:M (received)
                 // Group E (all 3)
-                TestMetadata("test-019", isRead = true, isStarred = false),
-                TestMetadata("test-020", isRead = true, isStarred = false),
-                TestMetadata("test-021", isRead = true, isStarred = false),
+                TestMetadata("test-019", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D,Alice cc:A (sent)
+                TestMetadata("test-020", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,Bob cc:A (received)
+                TestMetadata("test-021", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
                 // Group F (test-022, test-024 only - NOT test-023 which is D→Bob bcc:A)
-                TestMetadata("test-022", isRead = true, isStarred = false), // M→Alice bcc:D - M sees as sender
-                TestMetadata("test-024", isRead = true, isStarred = false), // A→Carol bcc:M - M sees as BCC
+                TestMetadata("test-022", isRead = true, isStarred = false, folderId = Folders.SENT), // M→Alice bcc:D (sent)
+                TestMetadata("test-024", isRead = true, isStarred = false, folderId = Folders.PROMOTIONS), // A→Carol bcc:M - Promotions
                 // Group G (all 3)
-                TestMetadata("test-025", isRead = true, isStarred = false, tags = listOf(Tags.WORK, Tags.IMPORTANT)), // TAGGED
-                TestMetadata("test-026", isRead = true, isStarred = false),
-                TestMetadata("test-027", isRead = true, isStarred = false),
+                TestMetadata("test-025", isRead = true, isStarred = false, tags = listOf(Tags.WORK, Tags.IMPORTANT), folderId = Folders.SENT), // M→D,Alice cc:A bcc:Bob (sent) TAGGED
+                TestMetadata("test-026", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A,Bob cc:M (received)
+                TestMetadata("test-027", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
                 // Group H (test-028, test-030 only - NOT test-029 which is D→Bob,Carol bcc:A)
-                TestMetadata("test-028", isRead = true, isStarred = false), // M→Alice,Bob bcc:D - M sees as sender
-                TestMetadata("test-030", isRead = true, isStarred = false), // A→Alice,Carol bcc:M - M sees as BCC
+                TestMetadata("test-028", isRead = true, isStarred = false, folderId = Folders.SENT), // M→Alice,Bob bcc:D (sent)
+                TestMetadata("test-030", isRead = true, isStarred = false, folderId = Folders.SPAM), // A→Alice,Carol bcc:M - Spam
                 // Group I (all 4)
-                TestMetadata("test-031", isRead = false, isStarred = false), // UNREAD
-                TestMetadata("test-032", isRead = true, isStarred = false),
-                TestMetadata("test-033", isRead = true, isStarred = false),
-                TestMetadata("test-034", isRead = true, isStarred = false),
+                TestMetadata("test-031", isRead = false, isStarred = false, folderId = Folders.SENT), // M→D,A (sent) UNREAD
+                TestMetadata("test-032", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
+                TestMetadata("test-033", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
+                TestMetadata("test-034", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D cc:A (sent)
                 // Group J - private M↔D (all 4)
-                TestMetadata("test-035", isRead = true, isStarred = true), // STARRED
-                TestMetadata("test-036", isRead = true, isStarred = false),
-                TestMetadata("test-037", isRead = true, isStarred = false),
-                TestMetadata("test-038", isRead = true, isStarred = false),
+                TestMetadata("test-035", isRead = true, isStarred = true, folderId = Folders.TRASH, isDeleted = true), // M→D (Trash) STARRED
+                TestMetadata("test-036", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M (received)
+                TestMetadata("test-037", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D (sent)
+                TestMetadata("test-038", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M (received)
                 // Group K
-                TestMetadata("test-039", isRead = true, isStarred = false)
+                TestMetadata("test-039", isRead = true, isStarred = false, folderId = Folders.SENT) // M→D,A (sent)
             )
 
             TestUsers.DUSAN.lowercase() -> listOf(
-                // DUSAN sees 33 emails
+                // DUSAN sees 33 emails (Inbox=18, Sent=12, Promotions=1, Spam=1, Trash=1)
                 // NOT visible: test-003 (A→M), test-009 (M→A), test-010 (A→M), test-024 (A→Carol bcc:M), test-030 (A→Alice,Carol bcc:M)
+                // Industry-standard: Sent = user is sender, Inbox = user is recipient (not sender)
                 // Group A (test-001, test-002 only - NOT test-003)
-                TestMetadata("test-001", isRead = false, isStarred = false), // UNREAD
-                TestMetadata("test-002", isRead = true, isStarred = false),
+                TestMetadata("test-001", isRead = false, isStarred = false, folderId = Folders.INBOX), // M→D (received) UNREAD
+                TestMetadata("test-002", isRead = true, isStarred = false, folderId = Folders.SENT), // D→A (sent)
                 // Group B (all 3)
-                TestMetadata("test-004", isRead = true, isStarred = false),
-                TestMetadata("test-005", isRead = true, isStarred = false),
-                TestMetadata("test-006", isRead = true, isStarred = false),
+                TestMetadata("test-004", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
+                TestMetadata("test-005", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M,A (sent)
+                TestMetadata("test-006", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
                 // Group C (M↔D and D↔A only - NOT test-009, test-010)
-                TestMetadata("test-007", isRead = true, isStarred = true), // STARRED
-                TestMetadata("test-008", isRead = true, isStarred = false),
-                TestMetadata("test-011", isRead = true, isStarred = false),
-                TestMetadata("test-012", isRead = true, isStarred = false),
+                TestMetadata("test-007", isRead = true, isStarred = true, folderId = Folders.INBOX), // M→D (received) STARRED
+                TestMetadata("test-008", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M (sent)
+                TestMetadata("test-011", isRead = true, isStarred = false, folderId = Folders.SENT), // D→A (sent)
+                TestMetadata("test-012", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→D (received)
                 // Group D (all 6)
-                TestMetadata("test-013", isRead = true, isStarred = false),
-                TestMetadata("test-014", isRead = true, isStarred = false),
-                TestMetadata("test-015", isRead = true, isStarred = false),
-                TestMetadata("test-016", isRead = true, isStarred = false),
-                TestMetadata("test-017", isRead = true, isStarred = false),
-                TestMetadata("test-018", isRead = true, isStarred = false),
+                TestMetadata("test-013", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
+                TestMetadata("test-014", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→A cc:D (received)
+                TestMetadata("test-015", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M cc:A (sent)
+                TestMetadata("test-016", isRead = true, isStarred = false, folderId = Folders.SENT), // D→A cc:M (sent)
+                TestMetadata("test-017", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M cc:D (received)
+                TestMetadata("test-018", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→D cc:M (received)
                 // Group E (all 3)
-                TestMetadata("test-019", isRead = true, isStarred = true), // STARRED
-                TestMetadata("test-020", isRead = true, isStarred = false),
-                TestMetadata("test-021", isRead = true, isStarred = false),
+                TestMetadata("test-019", isRead = true, isStarred = true, folderId = Folders.INBOX), // M→D,Alice cc:A (received) STARRED
+                TestMetadata("test-020", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M,Bob cc:A (sent)
+                TestMetadata("test-021", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
                 // Group F (test-022, test-023 only - NOT test-024 which is A→Carol bcc:M)
-                TestMetadata("test-022", isRead = true, isStarred = false), // M→Alice bcc:D - D sees as BCC
-                TestMetadata("test-023", isRead = true, isStarred = false), // D→Bob bcc:A - D sees as sender
+                TestMetadata("test-022", isRead = true, isStarred = false, folderId = Folders.PROMOTIONS), // M→Alice bcc:D - Promotions
+                TestMetadata("test-023", isRead = true, isStarred = false, folderId = Folders.SENT), // D→Bob bcc:A (sent)
                 // Group G (all 3)
-                TestMetadata("test-025", isRead = true, isStarred = false),
-                TestMetadata("test-026", isRead = true, isStarred = false, tags = listOf(Tags.URGENT)), // TAGGED
-                TestMetadata("test-027", isRead = true, isStarred = false),
+                TestMetadata("test-025", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,Alice cc:A (received)
+                TestMetadata("test-026", isRead = true, isStarred = false, tags = listOf(Tags.URGENT), folderId = Folders.SENT), // D→A,Bob cc:M (sent) TAGGED
+                TestMetadata("test-027", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
                 // Group H (test-028, test-029 only - NOT test-030 which is A→Alice,Carol bcc:M)
-                TestMetadata("test-028", isRead = true, isStarred = false), // M→Alice,Bob bcc:D - D sees as BCC
-                TestMetadata("test-029", isRead = true, isStarred = false), // D→Bob,Carol bcc:A - D sees as sender
+                TestMetadata("test-028", isRead = true, isStarred = false, folderId = Folders.SPAM), // M→Alice,Bob bcc:D - Spam
+                TestMetadata("test-029", isRead = true, isStarred = false, folderId = Folders.SENT), // D→Bob,Carol bcc:A (sent)
                 // Group I (all 4)
-                TestMetadata("test-031", isRead = true, isStarred = false),
-                TestMetadata("test-032", isRead = false, isStarred = false), // UNREAD
-                TestMetadata("test-033", isRead = true, isStarred = false),
-                TestMetadata("test-034", isRead = true, isStarred = false),
+                TestMetadata("test-031", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
+                TestMetadata("test-032", isRead = false, isStarred = false, folderId = Folders.SENT), // D→M cc:A (sent) UNREAD
+                TestMetadata("test-033", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
+                TestMetadata("test-034", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
                 // Group J - private M↔D (all 4)
-                TestMetadata("test-035", isRead = true, isStarred = false),
-                TestMetadata("test-036", isRead = true, isStarred = false),
-                TestMetadata("test-037", isRead = true, isStarred = false),
-                TestMetadata("test-038", isRead = true, isStarred = false),
+                TestMetadata("test-035", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D (received)
+                TestMetadata("test-036", isRead = true, isStarred = false, folderId = Folders.TRASH, isDeleted = true), // D→M (Trash)
+                TestMetadata("test-037", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D (received)
+                TestMetadata("test-038", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M (sent)
                 // Group K
-                TestMetadata("test-039", isRead = true, isStarred = false)
+                TestMetadata("test-039", isRead = true, isStarred = false, folderId = Folders.INBOX) // M→D,A (received)
             )
 
             TestUsers.ARAMBA.lowercase() -> listOf(
-                // ARAMBA sees 27 emails
+                // ARAMBA sees 26 emails (Inbox=13, Sent=10, Promotions=1, Spam=1, Trash=1)
                 // NOT visible: test-001 (M→D), test-007 (M→D), test-008 (D→M), test-022 (M→Alice bcc:D),
                 //              test-028 (M→Alice,Bob bcc:D), test-035-038 (M↔D private chain)
+                // Industry-standard: Sent = user is sender, Inbox = user is recipient (not sender)
                 // Group A (test-002, test-003 only - NOT test-001)
-                TestMetadata("test-002", isRead = false, isStarred = false), // UNREAD
-                TestMetadata("test-003", isRead = true, isStarred = false),
+                TestMetadata("test-002", isRead = false, isStarred = false, folderId = Folders.INBOX), // D→A (received) UNREAD
+                TestMetadata("test-003", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M (sent)
                 // Group B (all 3)
-                TestMetadata("test-004", isRead = true, isStarred = false),
-                TestMetadata("test-005", isRead = true, isStarred = false),
-                TestMetadata("test-006", isRead = true, isStarred = false),
+                TestMetadata("test-004", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
+                TestMetadata("test-005", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,A (received)
+                TestMetadata("test-006", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M,D (sent)
                 // Group C (M↔A and D↔A only - NOT test-007, test-008)
-                TestMetadata("test-009", isRead = true, isStarred = false),
-                TestMetadata("test-010", isRead = true, isStarred = false),
-                TestMetadata("test-011", isRead = true, isStarred = false),
-                TestMetadata("test-012", isRead = true, isStarred = false),
+                TestMetadata("test-009", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→A (received)
+                TestMetadata("test-010", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M (sent)
+                TestMetadata("test-011", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A (received)
+                TestMetadata("test-012", isRead = true, isStarred = false, folderId = Folders.SENT), // A→D (sent)
                 // Group D (all 6)
-                TestMetadata("test-013", isRead = true, isStarred = false),
-                TestMetadata("test-014", isRead = true, isStarred = true), // STARRED
-                TestMetadata("test-015", isRead = true, isStarred = false),
-                TestMetadata("test-016", isRead = true, isStarred = false),
-                TestMetadata("test-017", isRead = true, isStarred = false),
-                TestMetadata("test-018", isRead = true, isStarred = false),
+                TestMetadata("test-013", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
+                TestMetadata("test-014", isRead = true, isStarred = true, folderId = Folders.INBOX), // M→A cc:D (received) STARRED
+                TestMetadata("test-015", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
+                TestMetadata("test-016", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A cc:M (received)
+                TestMetadata("test-017", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M cc:D (sent)
+                TestMetadata("test-018", isRead = true, isStarred = false, folderId = Folders.SENT), // A→D cc:M (sent)
                 // Group E (all 3)
-                TestMetadata("test-019", isRead = true, isStarred = false),
-                TestMetadata("test-020", isRead = true, isStarred = false),
-                TestMetadata("test-021", isRead = true, isStarred = false),
+                TestMetadata("test-019", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,Alice cc:A (received)
+                TestMetadata("test-020", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,Bob cc:A (received)
+                TestMetadata("test-021", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M,Carol cc:D (sent)
                 // Group F (test-023, test-024 only - NOT test-022 which is M→Alice bcc:D)
-                TestMetadata("test-023", isRead = true, isStarred = true), // STARRED - D→Bob bcc:A - A sees as BCC
-                TestMetadata("test-024", isRead = true, isStarred = false), // A→Carol bcc:M - A sees as sender
+                TestMetadata("test-023", isRead = true, isStarred = true, folderId = Folders.PROMOTIONS), // D→Bob bcc:A - Promotions STARRED
+                TestMetadata("test-024", isRead = true, isStarred = false, folderId = Folders.SENT), // A→Carol bcc:M (sent)
                 // Group G (all 3)
-                TestMetadata("test-025", isRead = true, isStarred = false),
-                TestMetadata("test-026", isRead = true, isStarred = false),
-                TestMetadata("test-027", isRead = true, isStarred = false, tags = listOf(Tags.PERSONAL, Tags.FINANCE)), // TAGGED
+                TestMetadata("test-025", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,Alice cc:A (received)
+                TestMetadata("test-026", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A,Bob cc:M (received)
+                TestMetadata("test-027", isRead = true, isStarred = false, tags = listOf(Tags.PERSONAL, Tags.FINANCE), folderId = Folders.SENT), // A→M,Carol cc:D (sent) TAGGED
                 // Group H (test-029, test-030 only - NOT test-028 which is M→Alice,Bob bcc:D)
-                TestMetadata("test-029", isRead = true, isStarred = false), // D→Bob,Carol bcc:A - A sees as BCC
-                TestMetadata("test-030", isRead = true, isStarred = false), // A→Alice,Carol bcc:M - A sees as sender
+                TestMetadata("test-029", isRead = true, isStarred = false, folderId = Folders.SPAM), // D→Bob,Carol bcc:A - Spam
+                TestMetadata("test-030", isRead = true, isStarred = false, folderId = Folders.SENT), // A→Alice,Carol bcc:M (sent)
                 // Group I (all 4)
-                TestMetadata("test-031", isRead = true, isStarred = false),
-                TestMetadata("test-032", isRead = true, isStarred = false),
-                TestMetadata("test-033", isRead = false, isStarred = false), // UNREAD
-                TestMetadata("test-034", isRead = true, isStarred = false),
+                TestMetadata("test-031", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
+                TestMetadata("test-032", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
+                TestMetadata("test-033", isRead = false, isStarred = false, folderId = Folders.TRASH, isDeleted = true), // A→M,D (Trash) UNREAD
+                TestMetadata("test-034", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
                 // Group J - NOT included (M↔D private - ARAMBA excluded)
                 // Group K
-                TestMetadata("test-039", isRead = true, isStarred = false)
+                TestMetadata("test-039", isRead = true, isStarred = false, folderId = Folders.INBOX) // M→D,A (received)
             )
 
             else -> emptyList()
@@ -756,28 +792,40 @@ class TestDataSeeder(
             }
             Log.d(TAG, "Deleted ${testEmailIds.size} test emails from allMessages")
 
-            // Delete metadata for all 3 test users
+            // Delete metadata and folders for all 3 test users using hardcoded UIDs
             val userIds = mapOf(
-                TestUsers.MILOS to getUserIdByEmail(TestUsers.MILOS),
-                TestUsers.DUSAN to getUserIdByEmail(TestUsers.DUSAN),
-                TestUsers.ARAMBA to getUserIdByEmail(TestUsers.ARAMBA)
+                TestUsers.MILOS to TestUsers.MILOS_UID,
+                TestUsers.DUSAN to TestUsers.DUSAN_UID,
+                TestUsers.ARAMBA to TestUsers.ARAMBA_UID
             )
 
             userIds.forEach { (email, foundUserId) ->
-                if (foundUserId != null) {
-                    try {
-                        val metadataCollection = firestore.collection(Collections.USERS)
-                            .document(foundUserId)
-                            .collection(Collections.MESSAGES_METADATA)
+                try {
+                    val metadataCollection = firestore.collection(Collections.USERS)
+                        .document(foundUserId)
+                        .collection(Collections.MESSAGES_METADATA)
 
-                        val metadata = metadataCollection.get().await()
-                        metadata.documents.forEach { doc ->
-                            doc.reference.delete().await()
-                        }
-                        Log.d(TAG, "Deleted ${metadata.size()} metadata documents for $email")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Failed to delete metadata for $email: ${e.message}")
+                    val metadata = metadataCollection.get().await()
+                    metadata.documents.forEach { doc ->
+                        doc.reference.delete().await()
                     }
+                    Log.d(TAG, "Deleted ${metadata.size()} metadata documents for $email")
+
+                    // Also delete test folders
+                    val foldersCollection = firestore.collection(Collections.USERS)
+                        .document(foundUserId)
+                        .collection(Collections.FOLDERS)
+
+                    testFolders.forEach { folder ->
+                        try {
+                            foldersCollection.document(folder.id).delete().await()
+                        } catch (_: Exception) {
+                            // Ignore if doesn't exist
+                        }
+                    }
+                    Log.d(TAG, "Deleted ${testFolders.size} folders for $email")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to delete metadata/folders for $email: ${e.message}")
                 }
             }
 

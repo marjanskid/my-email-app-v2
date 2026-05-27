@@ -40,4 +40,7 @@ interface EmailRepository {
     suspend fun removeTag(emailId: String, tagId: String): Result<Unit>
     suspend fun markAsRead(emailId: String, isRead: Boolean): Result<Unit>
     suspend fun toggleStar(emailId: String, isStarred: Boolean): Result<Unit>
+    suspend fun getEmailCountByFolderId(folderId: String): Result<Int>
+    suspend fun getEmailsByFolderId(folderId: String): Result<List<Email>>
+    suspend fun softDeleteEmail(emailId: String): Result<Unit>
 }
