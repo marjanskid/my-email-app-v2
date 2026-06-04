@@ -5,7 +5,7 @@ import com.example.myemailapp.data.constants.FirestoreFirebaseConstants.Collecti
 import com.example.myemailapp.data.model.AttachmentDto
 import com.example.myemailapp.data.model.EmailDto
 import com.example.myemailapp.data.model.EmailMetadataDto
-import com.example.myemailapp.data.model.TagDto
+import com.example.myemailapp.data.model.RuleDto
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -21,833 +21,427 @@ class TestDataSeeder(
         private const val TAG = "TestDataSeeder"
     }
 
-    // Test user email constants with hardcoded Firebase Auth UIDs
+    // Test users with hardcoded Firebase Auth UIDs
     private object TestUsers {
-        const val MILOS = "milos.krstic@myapp.com"
-        const val MILOS_UID = "TDuLwVlceIefe6Sbafr8GtcABRP2"
+        const val DUSAN_EMAIL = "dmarjanski@email.app"
+        const val DUSAN_UID = "05uS8DRYj5ZAPEJrpkG1rXdccmz2"
+        const val MARKO_EMAIL = "mmarkovic@email.app"
+        const val MARKO_UID = "0wfIFsTxqGgx9t8CMdeRtmckt1k1"
+        const val PETAR_EMAIL = "ppetrovic@email.app"
+        const val PETAR_UID = "DW77lMBOtlgKc2wgRo1Aa9pTn8z1"
 
-        const val DUSAN = "dusan.m@myemailapp.com"
-        const val DUSAN_UID = "sH5evcNw3ORTtWuWSvaLYpijyAJ3"
-
-        const val ARAMBA = "aramba.test@myapp.com"
-        const val ARAMBA_UID = "tg7qIKiopWU0C4H0tDq9dSXCCbr1"
+        val ALL_EMAILS = listOf(DUSAN_EMAIL, MARKO_EMAIL, PETAR_EMAIL)
+        val ALL_UIDS = listOf(DUSAN_UID, MARKO_UID, PETAR_UID)
     }
 
-    // Predefined tags
-    private object Tags {
-        val WORK = TagDto("tag-work", "Work", "#4CAF50")
-        val PERSONAL = TagDto("tag-personal", "Personal", "#2196F3")
-        val IMPORTANT = TagDto("tag-important", "Important", "#F44336")
-        val URGENT = TagDto("tag-urgent", "Urgent", "#FF9800")
-        val NEWSLETTER = TagDto("tag-newsletter", "Newsletter", "#9C27B0")
-        val FINANCE = TagDto("tag-finance", "Finance", "#009688")
-    }
-
-    // Predefined folder IDs for test data
+    // Folder IDs
     private object Folders {
         const val INBOX = "folder-inbox"
         const val SENT = "folder-sent"
+        const val WORK = "folder-work"
+        const val PERSONAL = "folder-personal"
         const val SPAM = "folder-spam"
-        const val PROMOTIONS = "folder-promotions"
         const val TRASH = "folder-trash"
     }
 
-    // Helper data class for test folder definitions
-    private data class TestFolder(
-        val id: String,
-        val name: String
+    // Folder definitions (6 folders per user)
+    private data class FolderDef(val id: String, val name: String)
+
+    private val folders = listOf(
+        FolderDef(Folders.INBOX, "Inbox"),
+        FolderDef(Folders.SENT, "Sent"),
+        FolderDef(Folders.WORK, "Work"),
+        FolderDef(Folders.PERSONAL, "Personal"),
+        FolderDef(Folders.SPAM, "Spam"),
+        FolderDef(Folders.TRASH, "Trash")
     )
 
-    // Test folders to create for each user
-    private val testFolders = listOf(
-        TestFolder(Folders.INBOX, "Inbox"),
-        TestFolder(Folders.SENT, "Sent"),
-        TestFolder(Folders.SPAM, "Spam"),
-        TestFolder(Folders.PROMOTIONS, "Promotions"),
-        TestFolder(Folders.TRASH, "Trash")
+    // Rule definition per user
+    private data class UserRule(
+        val userId: String,
+        val ruleId: String,
+        val condition: String,
+        val conditionValue: String,
+        val operation: String,
+        val destinationFolderId: String,
+        val destinationFolderName: String
     )
 
-    // Helper data class for test email definitions
+    private val userRules = listOf(
+        // Dusan: FROM contains "work" → MOVE to Work folder
+        UserRule(
+            userId = TestUsers.DUSAN_UID,
+            ruleId = "rule-dusan-work",
+            condition = "FROM",
+            conditionValue = "work",
+            operation = "MOVE",
+            destinationFolderId = Folders.WORK,
+            destinationFolderName = "Work"
+        ),
+        // Marko: SUBJECT contains "urgent" → MOVE to Personal folder
+        UserRule(
+            userId = TestUsers.MARKO_UID,
+            ruleId = "rule-marko-urgent",
+            condition = "SUBJECT",
+            conditionValue = "urgent",
+            operation = "MOVE",
+            destinationFolderId = Folders.PERSONAL,
+            destinationFolderName = "Personal"
+        ),
+        // Petar: FROM contains "spam" → DELETE (move to Trash)
+        UserRule(
+            userId = TestUsers.PETAR_UID,
+            ruleId = "rule-petar-spam",
+            condition = "FROM",
+            conditionValue = "spam",
+            operation = "DELETE",
+            destinationFolderId = Folders.TRASH,
+            destinationFolderName = "Trash"
+        )
+    )
+
+    // Email definition with expected folder per user
     private data class TestEmail(
         val id: String,
         val from: String,
-        val to: String,
-        val cc: String = "",
-        val bcc: String = "",
         val subject: String,
         val content: String,
-        val hoursAgo: Long = 1
+        val hoursAgo: Long,
+        // Which folder each user should see this email in (based on their rules)
+        val dusanFolder: String,
+        val markoFolder: String,
+        val petarFolder: String
     )
 
-    // Helper data class for metadata definitions
-    private data class TestMetadata(
-        val emailId: String,
-        val isRead: Boolean,
-        val isStarred: Boolean,
-        val tags: List<TagDto> = emptyList(),
-        val folderId: String? = null,
-        val isDeleted: Boolean = false
-    )
-
-    private fun buildRecipients(from: String, to: String, cc: String, bcc: String = ""): List<String> {
-        return buildList {
-            // Include sender so they can see sent emails
-            from.trim().lowercase().takeIf { it.isNotEmpty() }?.let { add(it) }
-            to.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
-            cc.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
-            bcc.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
-        }.distinct()
-    }
-
-    /**
-     * Seeds ALL test data (39 emails + metadata for all 3 users) in one click.
-     * Can be run by any authenticated user.
-     */
-    suspend fun seedAllTestData(): Result<Unit> {
-        auth.currentUser?.uid
-            ?: return Result.failure(IllegalStateException("User not authenticated"))
-
-        return try {
-            Log.d(TAG, "Starting seedAllTestData - creating 39 test emails for all users")
-
-            // Step 1: Use hardcoded UIDs for all 3 test users (no Firestore lookup needed)
-            val userIds = mapOf(
-                TestUsers.MILOS to TestUsers.MILOS_UID,
-                TestUsers.DUSAN to TestUsers.DUSAN_UID,
-                TestUsers.ARAMBA to TestUsers.ARAMBA_UID
-            )
-
-            Log.d(TAG, "Using hardcoded user IDs: ${userIds.entries.joinToString { "${it.key} -> ${it.value}" }}")
-
-            // Step 2: Create all 39 test emails in allMessages collection
-            val allMessagesCollection = firestore.collection(Collections.ALL_MESSAGES)
-
-            testEmails.forEachIndexed { index, testEmail ->
-                try {
-                    val dateTime = Timestamp(Date(System.currentTimeMillis() - testEmail.hoursAgo * 60 * 60 * 1000L))
-                    val recipients = buildRecipients(testEmail.from, testEmail.to, testEmail.cc, testEmail.bcc)
-
-                    val emailData = mapOf(
-                        "email" to EmailDto(
-                            id = testEmail.id,
-                            from = testEmail.from,
-                            to = testEmail.to,
-                            cc = testEmail.cc,
-                            bcc = testEmail.bcc,
-                            subject = testEmail.subject,
-                            content = testEmail.content,
-                            dateTime = dateTime,
-                            status = "sent",
-                            folderId = null
-                        ),
-                        "attachments" to emptyList<AttachmentDto>(),
-                        "recipients" to recipients
-                    )
-
-                    allMessagesCollection.document(testEmail.id).set(emailData).await()
-                    Log.d(TAG, "Email ${index + 1} (${testEmail.id}: ${testEmail.subject}) created successfully")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to create email ${index + 1} (${testEmail.id}): ${e.message}", e)
-                    throw e
-                }
-            }
-
-            Log.d(TAG, "All ${testEmails.size} test emails created successfully")
-
-            // Step 3: Create folders for each user
-            userIds.forEach { (email, userId) ->
-                try {
-                    val foldersCollection = firestore.collection(Collections.USERS)
-                        .document(userId)
-                        .collection(Collections.FOLDERS)
-
-                    testFolders.forEach { folder ->
-                        val folderData = mapOf(
-                            "id" to folder.id,
-                            "name" to folder.name
-                        )
-                        foldersCollection.document(folder.id).set(folderData).await()
-                    }
-
-                    Log.d(TAG, "Created ${testFolders.size} folders for $email (userId: $userId)")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to create folders for $email: ${e.message}", e)
-                    throw e
-                }
-            }
-
-            // Step 4: Create metadata for each user
-            userIds.forEach { (email, userId) ->
-                try {
-                    val metadataList = getMetadataForUser(email)
-                    val metadataCollection = firestore.collection(Collections.USERS)
-                        .document(userId)
-                        .collection(Collections.MESSAGES_METADATA)
-
-                    metadataList.forEach { metadata ->
-                        val metadataDto = EmailMetadataDto(
-                            tags = metadata.tags,
-                            isRead = metadata.isRead,
-                            isStarred = metadata.isStarred,
-                            folderId = metadata.folderId,
-                            isDeleted = metadata.isDeleted
-                        )
-                        metadataCollection.document(metadata.emailId).set(metadataDto).await()
-                    }
-
-                    Log.d(TAG, "Created ${metadataList.size} metadata entries for $email (userId: $userId)")
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to create metadata for $email: ${e.message}", e)
-                    throw e
-                }
-            }
-
-            Log.d(TAG, "seedAllTestData completed successfully")
-            Result.success(Unit)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to seed all test data: ${e.message}", e)
-            Result.failure(e)
-        }
-    }
-
-    // All 39 test emails with comprehensive TO/CC/BCC combinations
     private val testEmails = listOf(
-        // ============================================================================
-        // Group A: TO Only - Single Recipient (3 emails) - 2 users per email
-        // Tests: User NOT in email should NOT see it
-        // ============================================================================
+        // test-001: Normal email - goes to Inbox for everyone
         TestEmail(
             id = "test-001",
-            from = TestUsers.MILOS,
-            to = TestUsers.DUSAN,
-            subject = "[TO:1] M→D",
-            content = "Test email from Milos to Dusan only.\n\nThis email should only be visible to Milos and Dusan.\nAramba should NOT see this email.",
-            hoursAgo = 1
+            from = "friend@gmail.com",
+            subject = "Hello there",
+            content = "Hey! Just wanted to say hello and see how you're doing. Hope everything is going well!",
+            hoursAgo = 4,
+            dusanFolder = Folders.INBOX,
+            markoFolder = Folders.INBOX,
+            petarFolder = Folders.INBOX
         ),
+        // test-002: FROM contains "work" - triggers Dusan's rule (→ Work folder)
         TestEmail(
             id = "test-002",
-            from = TestUsers.DUSAN,
-            to = TestUsers.ARAMBA,
-            subject = "[TO:1] D→A",
-            content = "Test email from Dusan to Aramba only.\n\nThis email should only be visible to Dusan and Aramba.\nMilos should NOT see this email.",
-            hoursAgo = 2
+            from = "work@company.com",
+            subject = "Project update",
+            content = "Hi team, here's the latest update on the project. All milestones are on track for delivery.",
+            hoursAgo = 3,
+            dusanFolder = Folders.WORK,
+            markoFolder = Folders.INBOX,
+            petarFolder = Folders.INBOX
         ),
+        // test-003: SUBJECT contains "URGENT" - triggers Marko's rule (→ Personal folder)
         TestEmail(
             id = "test-003",
-            from = TestUsers.ARAMBA,
-            to = TestUsers.MILOS,
-            subject = "[TO:1] A→M",
-            content = "Test email from Aramba to Milos only.\n\nThis email should only be visible to Aramba and Milos.\nDusan should NOT see this email.",
-            hoursAgo = 3
+            from = "boss@email.com",
+            subject = "URGENT: Review needed",
+            content = "Please review the attached document and provide your feedback by end of day. This is urgent.",
+            hoursAgo = 2,
+            dusanFolder = Folders.INBOX,
+            markoFolder = Folders.PERSONAL,
+            petarFolder = Folders.INBOX
         ),
-
-        // ============================================================================
-        // Group B: TO Only - Two Recipients (3 emails) - 3 users per email
-        // ============================================================================
+        // test-004: FROM contains "spam" - triggers Petar's rule (→ Trash)
         TestEmail(
             id = "test-004",
-            from = TestUsers.MILOS,
-            to = "${TestUsers.DUSAN}, ${TestUsers.ARAMBA}",
-            subject = "[TO:2] M→D,A",
-            content = "Test email from Milos to both Dusan and Aramba.\n\nAll three users should see this email.",
-            hoursAgo = 4
-        ),
-        TestEmail(
-            id = "test-005",
-            from = TestUsers.DUSAN,
-            to = "${TestUsers.MILOS}, ${TestUsers.ARAMBA}",
-            subject = "[TO:2] D→M,A",
-            content = "Test email from Dusan to both Milos and Aramba.\n\nAll three users should see this email.",
-            hoursAgo = 5
-        ),
-        TestEmail(
-            id = "test-006",
-            from = TestUsers.ARAMBA,
-            to = "${TestUsers.MILOS}, ${TestUsers.DUSAN}",
-            subject = "[TO:2] A→M,D",
-            content = "Test email from Aramba to both Milos and Dusan.\n\nAll three users should see this email.",
-            hoursAgo = 6
-        ),
-
-        // ============================================================================
-        // Group C: TO Only - 2 users private (6 emails) - 2 users per email
-        // Tests: User NOT in TO should NOT see it
-        // ============================================================================
-        TestEmail(
-            id = "test-007",
-            from = TestUsers.MILOS,
-            to = TestUsers.DUSAN,
-            subject = "[TO:1] M→D private",
-            content = "Private conversation between Milos and Dusan.\n\nAramba should NOT see this.",
-            hoursAgo = 7
-        ),
-        TestEmail(
-            id = "test-008",
-            from = TestUsers.DUSAN,
-            to = TestUsers.MILOS,
-            subject = "[TO:1] D→M private",
-            content = "Private conversation between Dusan and Milos.\n\nAramba should NOT see this.",
-            hoursAgo = 8
-        ),
-        TestEmail(
-            id = "test-009",
-            from = TestUsers.MILOS,
-            to = TestUsers.ARAMBA,
-            subject = "[TO:1] M→A private",
-            content = "Private conversation between Milos and Aramba.\n\nDusan should NOT see this.",
-            hoursAgo = 9
-        ),
-        TestEmail(
-            id = "test-010",
-            from = TestUsers.ARAMBA,
-            to = TestUsers.MILOS,
-            subject = "[TO:1] A→M private",
-            content = "Private conversation between Aramba and Milos.\n\nDusan should NOT see this.",
-            hoursAgo = 10
-        ),
-        TestEmail(
-            id = "test-011",
-            from = TestUsers.DUSAN,
-            to = TestUsers.ARAMBA,
-            subject = "[TO:1] D→A private",
-            content = "Private conversation between Dusan and Aramba.\n\nMilos should NOT see this.",
-            hoursAgo = 11
-        ),
-        TestEmail(
-            id = "test-012",
-            from = TestUsers.ARAMBA,
-            to = TestUsers.DUSAN,
-            subject = "[TO:1] A→D private",
-            content = "Private conversation between Aramba and Dusan.\n\nMilos should NOT see this.",
-            hoursAgo = 12
-        ),
-
-        // ============================================================================
-        // Group D: TO(1) + CC(1) - 3 users (6 emails) - 3 users per email
-        // ============================================================================
-        TestEmail(
-            id = "test-013",
-            from = TestUsers.MILOS,
-            to = TestUsers.DUSAN,
-            cc = TestUsers.ARAMBA,
-            subject = "[TO:1,CC:1] M→D cc:A",
-            content = "Email from Milos to Dusan, with Aramba CC'd.\n\nAll three users should see this.",
-            hoursAgo = 13
-        ),
-        TestEmail(
-            id = "test-014",
-            from = TestUsers.MILOS,
-            to = TestUsers.ARAMBA,
-            cc = TestUsers.DUSAN,
-            subject = "[TO:1,CC:1] M→A cc:D",
-            content = "Email from Milos to Aramba, with Dusan CC'd.\n\nAll three users should see this.",
-            hoursAgo = 14
-        ),
-        TestEmail(
-            id = "test-015",
-            from = TestUsers.DUSAN,
-            to = TestUsers.MILOS,
-            cc = TestUsers.ARAMBA,
-            subject = "[TO:1,CC:1] D→M cc:A",
-            content = "Email from Dusan to Milos, with Aramba CC'd.\n\nAll three users should see this.",
-            hoursAgo = 15
-        ),
-        TestEmail(
-            id = "test-016",
-            from = TestUsers.DUSAN,
-            to = TestUsers.ARAMBA,
-            cc = TestUsers.MILOS,
-            subject = "[TO:1,CC:1] D→A cc:M",
-            content = "Email from Dusan to Aramba, with Milos CC'd.\n\nAll three users should see this.",
-            hoursAgo = 16
-        ),
-        TestEmail(
-            id = "test-017",
-            from = TestUsers.ARAMBA,
-            to = TestUsers.MILOS,
-            cc = TestUsers.DUSAN,
-            subject = "[TO:1,CC:1] A→M cc:D",
-            content = "Email from Aramba to Milos, with Dusan CC'd.\n\nAll three users should see this.",
-            hoursAgo = 17
-        ),
-        TestEmail(
-            id = "test-018",
-            from = TestUsers.ARAMBA,
-            to = TestUsers.DUSAN,
-            cc = TestUsers.MILOS,
-            subject = "[TO:1,CC:1] A→D cc:M",
-            content = "Email from Aramba to Dusan, with Milos CC'd.\n\nAll three users should see this.",
-            hoursAgo = 18
-        ),
-
-        // ============================================================================
-        // Group E: Mixed TO with external CC (3 emails) - 3 test users see these
-        // Natural conversations with external recipients
-        // ============================================================================
-        TestEmail(
-            id = "test-019",
-            from = TestUsers.MILOS,
-            to = "${TestUsers.DUSAN}, alice@example.com",
-            cc = TestUsers.ARAMBA,
-            subject = "[TO:2,CC:1] M→D,Alice cc:A",
-            content = "Email from Milos to Dusan and Alice, with Aramba CC'd.\n\nAll three test users should see this.",
-            hoursAgo = 19
-        ),
-        TestEmail(
-            id = "test-020",
-            from = TestUsers.DUSAN,
-            to = "${TestUsers.MILOS}, bob@example.com",
-            cc = TestUsers.ARAMBA,
-            subject = "[TO:2,CC:1] D→M,Bob cc:A",
-            content = "Email from Dusan to Milos and Bob, with Aramba CC'd.\n\nAll three test users should see this.",
-            hoursAgo = 20
-        ),
-        TestEmail(
-            id = "test-021",
-            from = TestUsers.ARAMBA,
-            to = "${TestUsers.MILOS}, carol@example.com",
-            cc = TestUsers.DUSAN,
-            subject = "[TO:2,CC:1] A→M,Carol cc:D",
-            content = "Email from Aramba to Milos and Carol, with Dusan CC'd.\n\nAll three test users should see this.",
-            hoursAgo = 21
-        ),
-
-        // ============================================================================
-        // Group F: TO(1) + BCC(1) - BCC with test user (3 emails)
-        // Tests: BCC recipient (test user) sees email, but TO recipient doesn't know about BCC
-        // External users in TO, test users in BCC
-        // ============================================================================
-        TestEmail(
-            id = "test-022",
-            from = TestUsers.MILOS,
-            to = "alice@example.com",
-            bcc = TestUsers.DUSAN,
-            subject = "[TO:1,BCC:1] M→Alice bcc:D",
-            content = "Email from Milos to Alice, with Dusan as BCC.\n\nDusan can see this via BCC. Alice is the visible recipient.",
-            hoursAgo = 22
-        ),
-        TestEmail(
-            id = "test-023",
-            from = TestUsers.DUSAN,
-            to = "bob@example.com",
-            bcc = TestUsers.ARAMBA,
-            subject = "[TO:1,BCC:1] D→Bob bcc:A",
-            content = "Email from Dusan to Bob, with Aramba as BCC.\n\nAramba can see this via BCC. Bob is the visible recipient.",
-            hoursAgo = 23
-        ),
-        TestEmail(
-            id = "test-024",
-            from = TestUsers.ARAMBA,
-            to = "carol@example.com",
-            bcc = TestUsers.MILOS,
-            subject = "[TO:1,BCC:1] A→Carol bcc:M",
-            content = "Email from Aramba to Carol, with Milos as BCC.\n\nMilos can see this via BCC. Carol is the visible recipient.",
-            hoursAgo = 24
-        ),
-
-        // ============================================================================
-        // Group G: TO + CC + BCC mixed with externals (3 emails) - 3 test users see these
-        // ============================================================================
-        TestEmail(
-            id = "test-025",
-            from = TestUsers.MILOS,
-            to = "${TestUsers.DUSAN}, alice@example.com",
-            cc = TestUsers.ARAMBA,
-            bcc = "bob@example.com",
-            subject = "[FULL] M→D,Alice cc:A bcc:Bob",
-            content = "Email with all recipient types including externals.\n\nTO: Dusan, Alice\nCC: Aramba\nBCC: Bob (external)\n\nAll three test users should see this.",
-            hoursAgo = 25
-        ),
-        TestEmail(
-            id = "test-026",
-            from = TestUsers.DUSAN,
-            to = "${TestUsers.ARAMBA}, bob@example.com",
-            cc = TestUsers.MILOS,
-            bcc = "alice@example.com",
-            subject = "[FULL] D→A,Bob cc:M bcc:Alice",
-            content = "Email with all recipient types including externals.\n\nTO: Aramba, Bob\nCC: Milos\nBCC: Alice (external)\n\nAll three test users should see this.",
-            hoursAgo = 26
-        ),
-        TestEmail(
-            id = "test-027",
-            from = TestUsers.ARAMBA,
-            to = "${TestUsers.MILOS}, carol@example.com",
-            cc = TestUsers.DUSAN,
-            bcc = "bob@example.com",
-            subject = "[FULL] A→M,Carol cc:D bcc:Bob",
-            content = "Email with all recipient types including externals.\n\nTO: Milos, Carol\nCC: Dusan\nBCC: Bob (external)\n\nAll three test users should see this.",
-            hoursAgo = 27
-        ),
-
-        // ============================================================================
-        // Group H: External TO with test user BCC (3 emails)
-        // Test users get BCC'd on external conversations
-        // ============================================================================
-        TestEmail(
-            id = "test-028",
-            from = TestUsers.MILOS,
-            to = "alice@example.com, bob@example.com",
-            bcc = TestUsers.DUSAN,
-            subject = "[TO:2,BCC:1] M→Alice,Bob bcc:D",
-            content = "Email from Milos to Alice and Bob, with Dusan as BCC.\n\nDusan can see this via BCC. Only Milos and Dusan (as test users) see this.",
-            hoursAgo = 28
-        ),
-        TestEmail(
-            id = "test-029",
-            from = TestUsers.DUSAN,
-            to = "bob@example.com, carol@example.com",
-            bcc = TestUsers.ARAMBA,
-            subject = "[TO:2,BCC:1] D→Bob,Carol bcc:A",
-            content = "Email from Dusan to Bob and Carol, with Aramba as BCC.\n\nAramba can see this via BCC. Only Dusan and Aramba (as test users) see this.",
-            hoursAgo = 29
-        ),
-        TestEmail(
-            id = "test-030",
-            from = TestUsers.ARAMBA,
-            to = "alice@example.com, carol@example.com",
-            bcc = TestUsers.MILOS,
-            subject = "[TO:2,BCC:1] A→Alice,Carol bcc:M",
-            content = "Email from Aramba to Alice and Carol, with Milos as BCC.\n\nMilos can see this via BCC. Only Aramba and Milos (as test users) see this.",
-            hoursAgo = 30
-        ),
-
-        // ============================================================================
-        // Group I: Reply Chain - 3 users (4 emails)
-        // ============================================================================
-        TestEmail(
-            id = "test-031",
-            from = TestUsers.MILOS,
-            to = "${TestUsers.DUSAN}, ${TestUsers.ARAMBA}",
-            subject = "[CHAIN-1] M→D,A",
-            content = "Starting a group conversation with all three team members.\n\nLet's discuss the project.",
-            hoursAgo = 4
-        ),
-        TestEmail(
-            id = "test-032",
-            from = TestUsers.DUSAN,
-            to = TestUsers.MILOS,
-            cc = TestUsers.ARAMBA,
-            subject = "[CHAIN-2] Re: D→M cc:A",
-            content = "Reply to the group conversation.\n\nI agree with the proposed approach.",
-            hoursAgo = 3
-        ),
-        TestEmail(
-            id = "test-033",
-            from = TestUsers.ARAMBA,
-            to = "${TestUsers.MILOS}, ${TestUsers.DUSAN}",
-            subject = "[CHAIN-3] Re:Re: A→M,D",
-            content = "Second reply in the chain.\n\nAdding my thoughts on the project timeline.",
-            hoursAgo = 2
-        ),
-        TestEmail(
-            id = "test-034",
-            from = TestUsers.MILOS,
-            to = TestUsers.DUSAN,
-            cc = TestUsers.ARAMBA,
-            subject = "[CHAIN-4] Re:Re:Re: M→D cc:A",
-            content = "Final reply in the chain.\n\nLet's schedule a meeting to finalize.",
-            hoursAgo = 1
-        ),
-
-        // ============================================================================
-        // Group J: Reply Chain - 2 users only (4 emails) - ARAMBA excluded
-        // Tests: Aramba should NOT see this conversation
-        // ============================================================================
-        TestEmail(
-            id = "test-035",
-            from = TestUsers.MILOS,
-            to = TestUsers.DUSAN,
-            subject = "[PRIVATE-1] M→D only",
-            content = "Starting a PRIVATE conversation between Milos and Dusan.\n\nAramba should NOT see this entire thread.",
-            hoursAgo = 8
-        ),
-        TestEmail(
-            id = "test-036",
-            from = TestUsers.DUSAN,
-            to = TestUsers.MILOS,
-            subject = "[PRIVATE-2] Re: D→M only",
-            content = "Reply to the private conversation.\n\nThis is just between us.",
-            hoursAgo = 7
-        ),
-        TestEmail(
-            id = "test-037",
-            from = TestUsers.MILOS,
-            to = TestUsers.DUSAN,
-            subject = "[PRIVATE-3] Re:Re: M→D only",
-            content = "Continuing our private discussion.\n\nStill just between Milos and Dusan.",
-            hoursAgo = 6
-        ),
-        TestEmail(
-            id = "test-038",
-            from = TestUsers.DUSAN,
-            to = TestUsers.MILOS,
-            subject = "[PRIVATE-4] Re:Re:Re: D→M only",
-            content = "Final message in our private thread.\n\nAramba never sees any of these.",
-            hoursAgo = 5
-        ),
-
-        // ============================================================================
-        // Group K: Complex - TO(3) CC(2) BCC(1) (1 email)
-        // ============================================================================
-        TestEmail(
-            id = "test-039",
-            from = TestUsers.MILOS,
-            to = "${TestUsers.DUSAN}, ${TestUsers.ARAMBA}",
-            cc = "${TestUsers.DUSAN}, ${TestUsers.ARAMBA}",
-            bcc = TestUsers.MILOS,
-            subject = "[MAX] TO:2,CC:2,BCC:1",
-            content = "Complex email with maximum recipient types.\n\nTO: Dusan, Aramba\nCC: Dusan, Aramba\nBCC: Milos\n\nAll three users should see this.",
-            hoursAgo = 0
+            from = "spam@ads.com",
+            subject = "Buy now!",
+            content = "Amazing deals just for you! Click here to claim your prize and save big money today!",
+            hoursAgo = 1,
+            dusanFolder = Folders.INBOX,
+            markoFolder = Folders.INBOX,
+            petarFolder = Folders.TRASH
         )
     )
 
     /**
-     * Returns the metadata assignments for a given user email.
-     * Based on email visibility rules and per-user customization.
-     *
-     * Visibility Summary (39 emails total):
-     * - MILOS (33): NOT visible = test-002, test-011, test-012 (D↔A private), test-023, test-029 (BCC'd to others)
-     * - DUSAN (33): NOT visible = test-003, test-009, test-010 (M↔A private), test-024, test-030 (BCC'd to others)
-     * - ARAMBA (27): NOT visible = test-001, test-007, test-008 (M↔D private), test-035-038 (M↔D chain), test-022, test-028 (BCC'd to others)
+     * Seeds all test data:
+     * - 6 Folders per user (Inbox, Sent, Work, Personal, Spam, Trash)
+     * - 1 Rule per user (Dusan: work→Work, Marko: urgent→Personal, Petar: spam→Trash)
+     * - 4 Emails with metadata placed according to each user's rules
      */
-    private fun getMetadataForUser(userEmail: String): List<TestMetadata> {
-        return when (userEmail.lowercase()) {
-            TestUsers.MILOS.lowercase() -> listOf(
-                // MILOS sees 33 emails (Inbox=16, Sent=14, Promotions=1, Spam=1, Trash=1)
-                // NOT visible: test-002 (D→A), test-011 (D→A), test-012 (A→D), test-023 (D→Bob bcc:A), test-029 (D→Bob,Carol bcc:A)
-                // Industry-standard: Sent = user is sender, Inbox = user is recipient (not sender)
-                // Group A (test-001, test-003 only - NOT test-002)
-                TestMetadata("test-001", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D (sent)
-                TestMetadata("test-003", isRead = false, isStarred = false, folderId = Folders.INBOX), // A→M (received) UNREAD
-                // Group B (all 3)
-                TestMetadata("test-004", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D,A (sent)
-                TestMetadata("test-005", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,A (received)
-                TestMetadata("test-006", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
-                // Group C (M↔D and M↔A only - NOT test-011, test-012)
-                TestMetadata("test-007", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D (sent)
-                TestMetadata("test-008", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M (received)
-                TestMetadata("test-009", isRead = true, isStarred = false, folderId = Folders.SENT), // M→A (sent)
-                TestMetadata("test-010", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M (received)
-                // Group D (all 6)
-                TestMetadata("test-013", isRead = true, isStarred = true, folderId = Folders.SENT), // M→D cc:A (sent) STARRED
-                TestMetadata("test-014", isRead = true, isStarred = false, folderId = Folders.SENT), // M→A cc:D (sent)
-                TestMetadata("test-015", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
-                TestMetadata("test-016", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A cc:M (received)
-                TestMetadata("test-017", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M cc:D (received)
-                TestMetadata("test-018", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→D cc:M (received)
-                // Group E (all 3)
-                TestMetadata("test-019", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D,Alice cc:A (sent)
-                TestMetadata("test-020", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,Bob cc:A (received)
-                TestMetadata("test-021", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
-                // Group F (test-022, test-024 only - NOT test-023 which is D→Bob bcc:A)
-                TestMetadata("test-022", isRead = true, isStarred = false, folderId = Folders.SENT), // M→Alice bcc:D (sent)
-                TestMetadata("test-024", isRead = true, isStarred = false, folderId = Folders.PROMOTIONS), // A→Carol bcc:M - Promotions
-                // Group G (all 3)
-                TestMetadata("test-025", isRead = true, isStarred = false, tags = listOf(Tags.WORK, Tags.IMPORTANT), folderId = Folders.SENT), // M→D,Alice cc:A bcc:Bob (sent) TAGGED
-                TestMetadata("test-026", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A,Bob cc:M (received)
-                TestMetadata("test-027", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
-                // Group H (test-028, test-030 only - NOT test-029 which is D→Bob,Carol bcc:A)
-                TestMetadata("test-028", isRead = true, isStarred = false, folderId = Folders.SENT), // M→Alice,Bob bcc:D (sent)
-                TestMetadata("test-030", isRead = true, isStarred = false, folderId = Folders.SPAM), // A→Alice,Carol bcc:M - Spam
-                // Group I (all 4)
-                TestMetadata("test-031", isRead = false, isStarred = false, folderId = Folders.SENT), // M→D,A (sent) UNREAD
-                TestMetadata("test-032", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
-                TestMetadata("test-033", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
-                TestMetadata("test-034", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D cc:A (sent)
-                // Group J - private M↔D (all 4)
-                TestMetadata("test-035", isRead = true, isStarred = true, folderId = Folders.TRASH, isDeleted = true), // M→D (Trash) STARRED
-                TestMetadata("test-036", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M (received)
-                TestMetadata("test-037", isRead = true, isStarred = false, folderId = Folders.SENT), // M→D (sent)
-                TestMetadata("test-038", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M (received)
-                // Group K
-                TestMetadata("test-039", isRead = true, isStarred = false, folderId = Folders.SENT) // M→D,A (sent)
-            )
-
-            TestUsers.DUSAN.lowercase() -> listOf(
-                // DUSAN sees 33 emails (Inbox=18, Sent=12, Promotions=1, Spam=1, Trash=1)
-                // NOT visible: test-003 (A→M), test-009 (M→A), test-010 (A→M), test-024 (A→Carol bcc:M), test-030 (A→Alice,Carol bcc:M)
-                // Industry-standard: Sent = user is sender, Inbox = user is recipient (not sender)
-                // Group A (test-001, test-002 only - NOT test-003)
-                TestMetadata("test-001", isRead = false, isStarred = false, folderId = Folders.INBOX), // M→D (received) UNREAD
-                TestMetadata("test-002", isRead = true, isStarred = false, folderId = Folders.SENT), // D→A (sent)
-                // Group B (all 3)
-                TestMetadata("test-004", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
-                TestMetadata("test-005", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M,A (sent)
-                TestMetadata("test-006", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
-                // Group C (M↔D and D↔A only - NOT test-009, test-010)
-                TestMetadata("test-007", isRead = true, isStarred = true, folderId = Folders.INBOX), // M→D (received) STARRED
-                TestMetadata("test-008", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M (sent)
-                TestMetadata("test-011", isRead = true, isStarred = false, folderId = Folders.SENT), // D→A (sent)
-                TestMetadata("test-012", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→D (received)
-                // Group D (all 6)
-                TestMetadata("test-013", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
-                TestMetadata("test-014", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→A cc:D (received)
-                TestMetadata("test-015", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M cc:A (sent)
-                TestMetadata("test-016", isRead = true, isStarred = false, folderId = Folders.SENT), // D→A cc:M (sent)
-                TestMetadata("test-017", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M cc:D (received)
-                TestMetadata("test-018", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→D cc:M (received)
-                // Group E (all 3)
-                TestMetadata("test-019", isRead = true, isStarred = true, folderId = Folders.INBOX), // M→D,Alice cc:A (received) STARRED
-                TestMetadata("test-020", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M,Bob cc:A (sent)
-                TestMetadata("test-021", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
-                // Group F (test-022, test-023 only - NOT test-024 which is A→Carol bcc:M)
-                TestMetadata("test-022", isRead = true, isStarred = false, folderId = Folders.PROMOTIONS), // M→Alice bcc:D - Promotions
-                TestMetadata("test-023", isRead = true, isStarred = false, folderId = Folders.SENT), // D→Bob bcc:A (sent)
-                // Group G (all 3)
-                TestMetadata("test-025", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,Alice cc:A (received)
-                TestMetadata("test-026", isRead = true, isStarred = false, tags = listOf(Tags.URGENT), folderId = Folders.SENT), // D→A,Bob cc:M (sent) TAGGED
-                TestMetadata("test-027", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,Carol cc:D (received)
-                // Group H (test-028, test-029 only - NOT test-030 which is A→Alice,Carol bcc:M)
-                TestMetadata("test-028", isRead = true, isStarred = false, folderId = Folders.SPAM), // M→Alice,Bob bcc:D - Spam
-                TestMetadata("test-029", isRead = true, isStarred = false, folderId = Folders.SENT), // D→Bob,Carol bcc:A (sent)
-                // Group I (all 4)
-                TestMetadata("test-031", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
-                TestMetadata("test-032", isRead = false, isStarred = false, folderId = Folders.SENT), // D→M cc:A (sent) UNREAD
-                TestMetadata("test-033", isRead = true, isStarred = false, folderId = Folders.INBOX), // A→M,D (received)
-                TestMetadata("test-034", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
-                // Group J - private M↔D (all 4)
-                TestMetadata("test-035", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D (received)
-                TestMetadata("test-036", isRead = true, isStarred = false, folderId = Folders.TRASH, isDeleted = true), // D→M (Trash)
-                TestMetadata("test-037", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D (received)
-                TestMetadata("test-038", isRead = true, isStarred = false, folderId = Folders.SENT), // D→M (sent)
-                // Group K
-                TestMetadata("test-039", isRead = true, isStarred = false, folderId = Folders.INBOX) // M→D,A (received)
-            )
-
-            TestUsers.ARAMBA.lowercase() -> listOf(
-                // ARAMBA sees 26 emails (Inbox=13, Sent=10, Promotions=1, Spam=1, Trash=1)
-                // NOT visible: test-001 (M→D), test-007 (M→D), test-008 (D→M), test-022 (M→Alice bcc:D),
-                //              test-028 (M→Alice,Bob bcc:D), test-035-038 (M↔D private chain)
-                // Industry-standard: Sent = user is sender, Inbox = user is recipient (not sender)
-                // Group A (test-002, test-003 only - NOT test-001)
-                TestMetadata("test-002", isRead = false, isStarred = false, folderId = Folders.INBOX), // D→A (received) UNREAD
-                TestMetadata("test-003", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M (sent)
-                // Group B (all 3)
-                TestMetadata("test-004", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
-                TestMetadata("test-005", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,A (received)
-                TestMetadata("test-006", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M,D (sent)
-                // Group C (M↔A and D↔A only - NOT test-007, test-008)
-                TestMetadata("test-009", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→A (received)
-                TestMetadata("test-010", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M (sent)
-                TestMetadata("test-011", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A (received)
-                TestMetadata("test-012", isRead = true, isStarred = false, folderId = Folders.SENT), // A→D (sent)
-                // Group D (all 6)
-                TestMetadata("test-013", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
-                TestMetadata("test-014", isRead = true, isStarred = true, folderId = Folders.INBOX), // M→A cc:D (received) STARRED
-                TestMetadata("test-015", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
-                TestMetadata("test-016", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A cc:M (received)
-                TestMetadata("test-017", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M cc:D (sent)
-                TestMetadata("test-018", isRead = true, isStarred = false, folderId = Folders.SENT), // A→D cc:M (sent)
-                // Group E (all 3)
-                TestMetadata("test-019", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,Alice cc:A (received)
-                TestMetadata("test-020", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M,Bob cc:A (received)
-                TestMetadata("test-021", isRead = true, isStarred = false, folderId = Folders.SENT), // A→M,Carol cc:D (sent)
-                // Group F (test-023, test-024 only - NOT test-022 which is M→Alice bcc:D)
-                TestMetadata("test-023", isRead = true, isStarred = true, folderId = Folders.PROMOTIONS), // D→Bob bcc:A - Promotions STARRED
-                TestMetadata("test-024", isRead = true, isStarred = false, folderId = Folders.SENT), // A→Carol bcc:M (sent)
-                // Group G (all 3)
-                TestMetadata("test-025", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,Alice cc:A (received)
-                TestMetadata("test-026", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→A,Bob cc:M (received)
-                TestMetadata("test-027", isRead = true, isStarred = false, tags = listOf(Tags.PERSONAL, Tags.FINANCE), folderId = Folders.SENT), // A→M,Carol cc:D (sent) TAGGED
-                // Group H (test-029, test-030 only - NOT test-028 which is M→Alice,Bob bcc:D)
-                TestMetadata("test-029", isRead = true, isStarred = false, folderId = Folders.SPAM), // D→Bob,Carol bcc:A - Spam
-                TestMetadata("test-030", isRead = true, isStarred = false, folderId = Folders.SENT), // A→Alice,Carol bcc:M (sent)
-                // Group I (all 4)
-                TestMetadata("test-031", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D,A (received)
-                TestMetadata("test-032", isRead = true, isStarred = false, folderId = Folders.INBOX), // D→M cc:A (received)
-                TestMetadata("test-033", isRead = false, isStarred = false, folderId = Folders.TRASH, isDeleted = true), // A→M,D (Trash) UNREAD
-                TestMetadata("test-034", isRead = true, isStarred = false, folderId = Folders.INBOX), // M→D cc:A (received)
-                // Group J - NOT included (M↔D private - ARAMBA excluded)
-                // Group K
-                TestMetadata("test-039", isRead = true, isStarred = false, folderId = Folders.INBOX) // M→D,A (received)
-            )
-
-            else -> emptyList()
-        }
-    }
-
-    /**
-     * Clears all test data including emails and metadata for all users.
-     */
-    suspend fun clearAllTestData(): Result<Unit> {
-        val userId = auth.currentUser?.uid
+    suspend fun seedTestData(): Result<Unit> {
+        auth.currentUser?.uid
             ?: return Result.failure(IllegalStateException("User not authenticated"))
 
         return try {
-            Log.d(TAG, "Starting clearAllTestData for user: $userId")
+            Log.d(TAG, "Starting seedTestData")
 
-            // Delete all 39 test emails from allMessages collection
-            val allMessagesCollection = firestore.collection(Collections.ALL_MESSAGES)
-            val testEmailIds = (1..39).map { "test-${it.toString().padStart(3, '0')}" }
+            // Step 1: Create folders for each user
+            seedFolders()
 
-            testEmailIds.forEach { emailId ->
-                try {
-                    allMessagesCollection.document(emailId).delete().await()
-                    Log.d(TAG, "Deleted test email: $emailId")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not delete $emailId (may not exist): ${e.message}")
-                }
-            }
-            Log.d(TAG, "Deleted ${testEmailIds.size} test emails from allMessages")
+            // Step 2: Create rules for each user
+            seedRules()
 
-            // Delete metadata and folders for all 3 test users using hardcoded UIDs
-            val userIds = mapOf(
-                TestUsers.MILOS to TestUsers.MILOS_UID,
-                TestUsers.DUSAN to TestUsers.DUSAN_UID,
-                TestUsers.ARAMBA to TestUsers.ARAMBA_UID
-            )
+            // Step 3: Create emails in allMessages collection
+            seedEmails()
 
-            userIds.forEach { (email, foundUserId) ->
-                try {
-                    val metadataCollection = firestore.collection(Collections.USERS)
-                        .document(foundUserId)
-                        .collection(Collections.MESSAGES_METADATA)
+            // Step 4: Create metadata for each user with correct folder placement
+            seedMetadata()
 
-                    val metadata = metadataCollection.get().await()
-                    metadata.documents.forEach { doc ->
-                        doc.reference.delete().await()
-                    }
-                    Log.d(TAG, "Deleted ${metadata.size()} metadata documents for $email")
-
-                    // Also delete test folders
-                    val foldersCollection = firestore.collection(Collections.USERS)
-                        .document(foundUserId)
-                        .collection(Collections.FOLDERS)
-
-                    testFolders.forEach { folder ->
-                        try {
-                            foldersCollection.document(folder.id).delete().await()
-                        } catch (_: Exception) {
-                            // Ignore if doesn't exist
-                        }
-                    }
-                    Log.d(TAG, "Deleted ${testFolders.size} folders for $email")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to delete metadata/folders for $email: ${e.message}")
-                }
-            }
-
-            // Also clean up legacy test emails (email-001 to email-006)
-            val legacyEmailIds = listOf("email-001", "email-002", "email-003", "email-004", "email-005", "email-006")
-            legacyEmailIds.forEach { emailId ->
-                try {
-                    allMessagesCollection.document(emailId).delete().await()
-                } catch (_: Exception) {
-                    // Ignore if doesn't exist
-                }
-            }
-            Log.d(TAG, "Cleaned up legacy test emails")
-
-            Log.d(TAG, "All test data cleared successfully")
+            Log.d(TAG, "seedTestData completed successfully")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear test data: ${e.message}", e)
+            Log.e(TAG, "Failed to seed test data: ${e.message}", e)
             Result.failure(e)
         }
     }
 
+    private suspend fun seedFolders() {
+        TestUsers.ALL_UIDS.forEachIndexed { index, userId ->
+            val userEmail = TestUsers.ALL_EMAILS[index]
+            val foldersCollection = firestore.collection(Collections.USERS)
+                .document(userId)
+                .collection(Collections.FOLDERS)
+
+            folders.forEach { folder ->
+                val folderData = mapOf(
+                    "id" to folder.id,
+                    "name" to folder.name
+                )
+                foldersCollection.document(folder.id).set(folderData).await()
+            }
+            Log.d(TAG, "Created ${folders.size} folders for $userEmail")
+        }
+    }
+
+    private suspend fun seedRules() {
+        userRules.forEach { rule ->
+            val rulesCollection = firestore.collection(Collections.USERS)
+                .document(rule.userId)
+                .collection(Collections.RULES)
+
+            val ruleDto = RuleDto(
+                id = rule.ruleId,
+                condition = rule.condition,
+                conditionValue = rule.conditionValue,
+                operation = rule.operation,
+                destinationFolderId = rule.destinationFolderId,
+                destinationFolderName = rule.destinationFolderName
+            )
+            rulesCollection.document(rule.ruleId).set(ruleDto).await()
+            Log.d(TAG, "Created rule ${rule.ruleId} for user ${rule.userId}")
+        }
+    }
+
+    private suspend fun seedEmails() {
+        val allMessagesCollection = firestore.collection(Collections.ALL_MESSAGES)
+        val toField = TestUsers.ALL_EMAILS.joinToString(", ")
+
+        testEmails.forEach { email ->
+            val dateTime = Timestamp(Date(System.currentTimeMillis() - email.hoursAgo * 60 * 60 * 1000L))
+            val recipients = buildRecipients(email.from, TestUsers.ALL_EMAILS)
+
+            val emailData = mapOf(
+                "email" to EmailDto(
+                    id = email.id,
+                    from = email.from,
+                    to = toField,
+                    cc = "",
+                    bcc = "",
+                    subject = email.subject,
+                    content = email.content,
+                    dateTime = dateTime,
+                    status = "sent",
+                    folderId = null
+                ),
+                "attachments" to emptyList<AttachmentDto>(),
+                "recipients" to recipients
+            )
+
+            allMessagesCollection.document(email.id).set(emailData).await()
+            Log.d(TAG, "Created email ${email.id}: ${email.subject}")
+        }
+    }
+
+    private suspend fun seedMetadata() {
+        testEmails.forEach { email ->
+            // Dusan's metadata
+            createMetadataForUser(TestUsers.DUSAN_UID, email.id, email.dusanFolder)
+            // Marko's metadata
+            createMetadataForUser(TestUsers.MARKO_UID, email.id, email.markoFolder)
+            // Petar's metadata
+            createMetadataForUser(TestUsers.PETAR_UID, email.id, email.petarFolder)
+        }
+    }
+
+    private suspend fun createMetadataForUser(userId: String, emailId: String, folderId: String) {
+        val metadataCollection = firestore.collection(Collections.USERS)
+            .document(userId)
+            .collection(Collections.MESSAGES_METADATA)
+
+        val isDeleted = folderId == Folders.TRASH
+        val metadataDto = EmailMetadataDto(
+            tags = emptyList(),
+            isRead = false,
+            isStarred = false,
+            folderId = folderId,
+            isDeleted = isDeleted
+        )
+        metadataCollection.document(emailId).set(metadataDto).await()
+        Log.d(TAG, "Created metadata for email $emailId, user $userId, folder $folderId")
+    }
+
+    private fun buildRecipients(from: String, toEmails: List<String>): List<String> {
+        return buildList {
+            from.trim().lowercase().takeIf { it.isNotEmpty() }?.let { add(it) }
+            toEmails.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.forEach { add(it) }
+        }.distinct()
+    }
+
+    /**
+     * Clears ALL data from Firestore:
+     * - allMessages (all documents)
+     * - users/{uid}/messagesMetadata (for all 3 users)
+     * - users/{uid}/folders (for all 3 users)
+     * - users/{uid}/rules (for all 3 users)
+     */
+    suspend fun clearAllData(): Result<Unit> {
+        auth.currentUser?.uid
+            ?: return Result.failure(IllegalStateException("User not authenticated"))
+
+        return try {
+            Log.d(TAG, "Starting clearAllData")
+
+            // Delete all test emails from allMessages
+            val allMessagesCollection = firestore.collection(Collections.ALL_MESSAGES)
+            testEmails.forEach { email ->
+                try {
+                    allMessagesCollection.document(email.id).delete().await()
+                    Log.d(TAG, "Deleted email: ${email.id}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not delete ${email.id}: ${e.message}")
+                }
+            }
+
+            // Delete metadata, folders, and rules for all 3 users
+            TestUsers.ALL_UIDS.forEachIndexed { index, userId ->
+                val userEmail = TestUsers.ALL_EMAILS[index]
+
+                // Delete metadata
+                val metadataCollection = firestore.collection(Collections.USERS)
+                    .document(userId)
+                    .collection(Collections.MESSAGES_METADATA)
+                testEmails.forEach { email ->
+                    try {
+                        metadataCollection.document(email.id).delete().await()
+                    } catch (_: Exception) { }
+                }
+                Log.d(TAG, "Deleted metadata for $userEmail")
+
+                // Delete folders
+                val foldersCollection = firestore.collection(Collections.USERS)
+                    .document(userId)
+                    .collection(Collections.FOLDERS)
+                folders.forEach { folder ->
+                    try {
+                        foldersCollection.document(folder.id).delete().await()
+                    } catch (_: Exception) { }
+                }
+                Log.d(TAG, "Deleted folders for $userEmail")
+
+                // Delete rules
+                val rulesCollection = firestore.collection(Collections.USERS)
+                    .document(userId)
+                    .collection(Collections.RULES)
+                userRules.filter { it.userId == userId }.forEach { rule ->
+                    try {
+                        rulesCollection.document(rule.ruleId).delete().await()
+                    } catch (_: Exception) { }
+                }
+                Log.d(TAG, "Deleted rules for $userEmail")
+            }
+
+            // Clean up legacy test data from old seeder
+            cleanupLegacyData()
+
+            Log.d(TAG, "clearAllData completed successfully")
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear data: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    private suspend fun cleanupLegacyData() {
+        val allMessagesCollection = firestore.collection(Collections.ALL_MESSAGES)
+
+        // Legacy email IDs from previous seeder versions
+        val legacyEmailIds = buildList {
+            // Old test-init-* and test-new-* patterns
+            (1..5).forEach { add("test-init-${it.toString().padStart(3, '0')}") }
+            (1..4).forEach { add("test-new-${it.toString().padStart(3, '0')}") }
+            // Very old patterns
+            (1..39).forEach { add("test-${it.toString().padStart(3, '0')}") }
+            addAll(listOf("email-001", "email-002", "email-003", "email-004", "email-005", "email-006"))
+        }
+
+        legacyEmailIds.forEach { emailId ->
+            try {
+                allMessagesCollection.document(emailId).delete().await()
+            } catch (_: Exception) { }
+        }
+
+        // Legacy folder IDs
+        val legacyFolderIds = listOf("folder-promotions")
+
+        // Legacy rule IDs
+        val legacyRuleIds = listOf("rule-work", "rule-spam")
+
+        // Old user UIDs (from previous seeder)
+        val oldUserUids = listOf(
+            "TDuLwVlceIefe6Sbafr8GtcABRP2",
+            "sH5evcNw3ORTtWuWSvaLYpijyAJ3",
+            "tg7qIKiopWU0C4H0tDq9dSXCCbr1"
+        )
+
+        // Clean up for all users (old and new)
+        val allUserUids = (TestUsers.ALL_UIDS + oldUserUids).distinct()
+
+        allUserUids.forEach { userId ->
+            try {
+                // Delete legacy metadata
+                val metadataCollection = firestore.collection(Collections.USERS)
+                    .document(userId)
+                    .collection(Collections.MESSAGES_METADATA)
+                legacyEmailIds.forEach { emailId ->
+                    try {
+                        metadataCollection.document(emailId).delete().await()
+                    } catch (_: Exception) { }
+                }
+
+                // Delete legacy folders
+                val foldersCollection = firestore.collection(Collections.USERS)
+                    .document(userId)
+                    .collection(Collections.FOLDERS)
+                (folders.map { it.id } + legacyFolderIds).forEach { folderId ->
+                    try {
+                        foldersCollection.document(folderId).delete().await()
+                    } catch (_: Exception) { }
+                }
+
+                // Delete legacy rules
+                val rulesCollection = firestore.collection(Collections.USERS)
+                    .document(userId)
+                    .collection(Collections.RULES)
+                legacyRuleIds.forEach { ruleId ->
+                    try {
+                        rulesCollection.document(ruleId).delete().await()
+                    } catch (_: Exception) { }
+                }
+            } catch (_: Exception) { }
+        }
+
+        Log.d(TAG, "Cleaned up legacy test data")
+    }
 }

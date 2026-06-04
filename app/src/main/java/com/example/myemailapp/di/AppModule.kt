@@ -6,10 +6,14 @@ import com.example.myemailapp.data.repository.ContactRepositoryImpl
 import com.example.myemailapp.data.repository.FoldersRepository
 import com.example.myemailapp.data.repository.FoldersRepositoryImpl
 import com.example.myemailapp.data.repository.EmailRepository
+import com.example.myemailapp.data.repository.RulesRepository
+import com.example.myemailapp.data.repository.RulesRepositoryImpl
 import com.example.myemailapp.data.repository.UserRepository
 import com.example.myemailapp.data.repository.UserRepositoryImpl
 import com.example.myemailapp.data.service.CreateFolderStatusService
 import com.example.myemailapp.data.service.EmailStatusService
+import com.example.myemailapp.data.service.RuleProcessingService
+import com.example.myemailapp.data.service.RuleProcessingServiceImpl
 import com.example.myemailapp.data.service.UpdateFolderStatusService
 import com.example.myemailapp.data.repository.AuthRepositoryImpl
 import com.example.myemailapp.data.repository.EmailRepositoryImpl
@@ -41,15 +45,24 @@ val appModule = module {
 
     // Repositories
     single<AuthRepository> { AuthRepositoryImpl(auth = get()) }
-    single<EmailRepository> { EmailRepositoryImpl(auth = get(), db = get()) }
+    single<EmailRepository> {
+        EmailRepositoryImpl(
+            auth = get(),
+            db = get(),
+            rulesRepository = get(),
+            ruleProcessingService = get()
+        )
+    }
     single<FoldersRepository> { FoldersRepositoryImpl(auth = get(), db = get()) }
     single<ContactRepository> { ContactRepositoryImpl(auth = get(), db = get()) }
     single<UserRepository> { UserRepositoryImpl(auth = get(), db = get()) }
+    single<RulesRepository> { RulesRepositoryImpl(auth = get(), db = get()) }
 
     // Services
     single<EmailStatusService> { EmailStatusServiceImpl() }
     single<CreateFolderStatusService> { CreateFolderStatusServiceImpl() }
     single<UpdateFolderStatusService> { UpdateFolderStatusServiceImpl() }
+    single<RuleProcessingService> { RuleProcessingServiceImpl() }
 
     // Utilities
     single { TestDataSeeder(firestore = get(), auth = get()) }
@@ -58,7 +71,7 @@ val appModule = module {
     viewModel { MainViewModel(get()) }
     viewModel { LoginViewModel(get()) }
     viewModel { EmailsViewModel(get(), get()) }
-    viewModel { ProfileViewModel(get()) }
+    viewModel { ProfileViewModel(get(), get(), get(), get()) }
     viewModel { CreateEmailViewModel(get(), get(), get()) }
     viewModel { ViewEmailViewModel(get(), get()) }
     viewModel { AttachmentViewModel() }

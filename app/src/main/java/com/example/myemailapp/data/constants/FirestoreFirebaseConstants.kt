@@ -4,11 +4,11 @@ object FirestoreFirebaseConstants {
     // Collection names
     object Collections {
         const val USERS = "users"
-        const val MESSAGES = "messages"
         const val FOLDERS = "folders"
         const val CONTACTS = "contacts"
         const val ALL_MESSAGES = "allMessages"
         const val MESSAGES_METADATA = "messagesMetadata"
+        const val RULES = "rules"
     }
 
     // Field names

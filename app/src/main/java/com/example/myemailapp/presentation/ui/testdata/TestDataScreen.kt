@@ -19,7 +19,6 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
@@ -55,6 +54,7 @@ fun TestDataScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
+    // Handle seeding state
     LaunchedEffect(key1 = state.seedingState) {
         when (val seedingState = state.seedingState) {
             is SeedingState.Success -> {
@@ -69,10 +69,11 @@ fun TestDataScreen(
         }
     }
 
+    // Handle clearing state
     LaunchedEffect(key1 = state.clearingState) {
         when (val clearingState = state.clearingState) {
             is ClearingState.Success -> {
-                snackbarHostState.showSnackbar("Test data cleared successfully!")
+                snackbarHostState.showSnackbar("All data cleared successfully!")
                 viewModel.resetClearingState()
             }
             is ClearingState.Error -> {
@@ -82,6 +83,9 @@ fun TestDataScreen(
             else -> {}
         }
     }
+
+    val isAnyOperationInProgress = state.seedingState is SeedingState.Seeding ||
+            state.clearingState is ClearingState.Clearing
 
     CustomNavigationDrawer(
         drawerState = drawerState,
@@ -143,45 +147,13 @@ fun TestDataScreen(
                         modifier = Modifier.padding(bottom = 24.dp)
                     )
 
-                    // Email ID input section
-                    OutlinedTextField(
-                        value = state.testEmailId,
-                        onValueChange = viewModel::updateTestEmailId,
-                        label = { Text("Enter Email ID") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-
-                    Text(
-                        text = "Test Email IDs: email-001, email-002, email-003, email-004, email-005",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = {
-                            if (state.testEmailId.isNotBlank()) {
-                                navController.navigate(Screen.ViewEmail.createRoute(state.testEmailId))
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = state.testEmailId.isNotBlank()
-                    ) {
-                        Text("View Email")
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Seed Test Data button
+                    // Button 1: Seed Test Data (Green)
                     Button(
                         onClick = viewModel::seedTestData,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = state.seedingState !is SeedingState.Seeding && state.clearingState !is ClearingState.Clearing,
+                        enabled = !isAnyOperationInProgress,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50)
+                            containerColor = Color(0xFF4CAF50) // Green
                         )
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -202,15 +174,20 @@ fun TestDataScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Creates folders, rules, and emails for all test users",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                    )
 
-                    // Clear Test Data button
+                    // Button 2: Clear All Data (Red)
                     Button(
-                        onClick = viewModel::clearTestData,
+                        onClick = viewModel::clearAllData,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = state.clearingState !is ClearingState.Clearing && state.seedingState !is SeedingState.Seeding,
+                        enabled = !isAnyOperationInProgress,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFF44336)
+                            containerColor = Color(0xFFF44336) // Red
                         )
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -226,10 +203,39 @@ fun TestDataScreen(
                                 if (state.clearingState is ClearingState.Clearing)
                                     "Clearing..."
                                 else
-                                    "Clear Test Data"
+                                    "Clear All Data"
                             )
                         }
                     }
+
+                    Text(
+                        text = "Deletes everything from Firestore",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
+                    )
+
+                    // Info section
+                    Text(
+                        text = "Test Users",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Text(
+                        text = "• Dusan Marjanski\n• Marko Markovic\n• Petar Petrovic",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Test Emails: test-001 to test-004",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
                 }
             }
         }

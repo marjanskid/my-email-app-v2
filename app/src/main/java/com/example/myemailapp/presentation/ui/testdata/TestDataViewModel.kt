@@ -15,14 +15,10 @@ class TestDataViewModel(
     private val _state = MutableStateFlow(TestDataState())
     val state = _state.asStateFlow()
 
-    fun updateTestEmailId(value: String) {
-        _state.update { it.copy(testEmailId = value) }
-    }
-
     fun seedTestData() {
         viewModelScope.launch {
             _state.update { it.copy(seedingState = SeedingState.Seeding) }
-            testDataSeeder.seedAllTestData()
+            testDataSeeder.seedTestData()
                 .onSuccess {
                     _state.update { it.copy(seedingState = SeedingState.Success) }
                 }
@@ -36,10 +32,10 @@ class TestDataViewModel(
         _state.update { it.copy(seedingState = SeedingState.Idle) }
     }
 
-    fun clearTestData() {
+    fun clearAllData() {
         viewModelScope.launch {
             _state.update { it.copy(clearingState = ClearingState.Clearing) }
-            testDataSeeder.clearAllTestData()
+            testDataSeeder.clearAllData()
                 .onSuccess {
                     _state.update { it.copy(clearingState = ClearingState.Success) }
                 }
