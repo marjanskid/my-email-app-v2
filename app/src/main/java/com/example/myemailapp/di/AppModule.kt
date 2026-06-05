@@ -10,6 +10,8 @@ import com.example.myemailapp.data.repository.RulesRepository
 import com.example.myemailapp.data.repository.RulesRepositoryImpl
 import com.example.myemailapp.data.repository.UserRepository
 import com.example.myemailapp.data.repository.UserRepositoryImpl
+import com.example.myemailapp.data.service.ContactStatusService
+import com.example.myemailapp.data.service.ContactStatusServiceImpl
 import com.example.myemailapp.data.service.CreateFolderStatusService
 import com.example.myemailapp.data.service.EmailStatusService
 import com.example.myemailapp.data.service.RuleProcessingService
@@ -33,6 +35,9 @@ import com.example.myemailapp.presentation.ui.login.LoginViewModel
 import com.example.myemailapp.presentation.ui.main.MainViewModel
 import com.example.myemailapp.presentation.ui.testdata.TestDataViewModel
 import com.example.myemailapp.presentation.ui.profile.ProfileViewModel
+import com.example.myemailapp.presentation.ui.contacts.ContactsViewModel
+import com.example.myemailapp.presentation.ui.contacts.ContactViewModel
+import com.example.myemailapp.presentation.ui.contacts.CreateContactViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import org.koin.core.module.dsl.viewModel
@@ -63,6 +68,7 @@ val appModule = module {
     single<CreateFolderStatusService> { CreateFolderStatusServiceImpl() }
     single<UpdateFolderStatusService> { UpdateFolderStatusServiceImpl() }
     single<RuleProcessingService> { RuleProcessingServiceImpl() }
+    single<ContactStatusService> { ContactStatusServiceImpl() }
 
     // Utilities
     single { TestDataSeeder(firestore = get(), auth = get()) }
@@ -80,4 +86,7 @@ val appModule = module {
     viewModel { ViewFolderViewModel(get(), get(), get(), get()) }
     viewModel { EditFolderViewModel(get(), get(), get()) }
     viewModel { TestDataViewModel(get()) }
+    viewModel { ContactsViewModel(get(), get()) }
+    viewModel { ContactViewModel(get(), get(), get()) }
+    viewModel { CreateContactViewModel(get(), get()) }
 }

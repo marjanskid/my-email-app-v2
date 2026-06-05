@@ -37,4 +37,9 @@ sealed class Screen(val route: String) {
         fun createRoute(folderId: String) = "edit-folder-screen/$folderId"
     }
     object TestData: Screen("test-data-screen")
+    object Contacts: Screen("contacts-screen")
+    object Contact : Screen("contact-screen/{contactId}") {
+        fun createRoute(contactId: String) = "contact-screen/$contactId"
+    }
+    object CreateContact: Screen("create-contact-screen")
 }

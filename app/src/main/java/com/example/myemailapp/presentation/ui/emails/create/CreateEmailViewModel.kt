@@ -10,6 +10,7 @@ import com.example.myemailapp.domain.model.db.Email
 import com.example.myemailapp.domain.model.EmailResult
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.data.repository.AuthRepository
+import com.example.myemailapp.presentation.ui.common.decodeBase64ToBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -99,7 +100,7 @@ class CreateEmailViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             emailRepository.send(email = emailFromState()).fold(
-                onSuccess = { emailId ->
+                onSuccess = { _ ->
                     emailStatusService.emitStatus(EmailResult.Sent)
                     withContext(Dispatchers.Main) {
                         _state.update { previous ->
@@ -134,7 +135,7 @@ class CreateEmailViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             emailRepository.saveDraft(email = emailFromState()).fold(
-                onSuccess = { data ->
+                onSuccess = { _ ->
                     emailStatusService.emitStatus(EmailResult.DraftSaved)
                     withContext(Dispatchers.Main) {
                         _state.update { previous ->
@@ -145,7 +146,7 @@ class CreateEmailViewModel(
                         }
                     }
                 },
-                onFailure = { failure ->
+                onFailure = { _ ->
                     withContext(Dispatchers.Main) {
                         _state.update { previous -> previous.copy(processState = ProcessState.Failure) }
                     }

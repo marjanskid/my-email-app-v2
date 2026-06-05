@@ -2,7 +2,7 @@ package com.example.myemailapp.presentation.ui.emails
 
 import androidx.lifecycle.ViewModel
 import com.example.myemailapp.presentation.model.AttachmentDisplayData
-import com.example.myemailapp.presentation.ui.emails.create.decodeBase64ToBitmap
+import com.example.myemailapp.presentation.ui.common.decodeBase64ToBitmap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

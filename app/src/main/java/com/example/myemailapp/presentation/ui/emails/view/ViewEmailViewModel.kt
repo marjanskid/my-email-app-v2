@@ -14,7 +14,7 @@ import com.example.myemailapp.domain.model.Tag
 import com.example.myemailapp.presentation.model.AttachmentDisplayData
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.presentation.ui.emails.create.calculateBase64Size
-import com.example.myemailapp.presentation.ui.emails.create.decodeBase64ToBitmap
+import com.example.myemailapp.presentation.ui.common.decodeBase64ToBitmap
 import com.example.myemailapp.presentation.ui.emails.create.formatFileSize
 import com.example.myemailapp.presentation.ui.emails.create.getFileTypeLabel
 import com.example.myemailapp.presentation.ui.emails.create.isImageMimeType
