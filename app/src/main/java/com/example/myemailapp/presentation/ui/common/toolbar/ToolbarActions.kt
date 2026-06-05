@@ -72,3 +72,10 @@ fun ViewEmailToolbarActions(
         }
     }
 }
+
+@Composable
+fun ContactsScreenToolbarActions(onNewContact: () -> Unit) {
+    IconButton(onClick = onNewContact) {
+        Icon(Icons.Filled.Add, contentDescription = "New contact")
+    }
+}

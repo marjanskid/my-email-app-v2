@@ -261,27 +261,7 @@ class EmailRepositoryImpl(
         return try {
             val tagDto = tag.toDto()
             val metadataRef = userEmailMetadataCollection().document(emailId)
-
-            // Get current metadata
-            val currentMetadata = metadataRef.get().await().toObject<EmailMetadataDto>()
-
-            if (currentMetadata != null) {
-                // Check if tag already exists
-                val existingTags = currentMetadata.tags
-                if (existingTags.none { it.id == tag.id }) {
-                    // Add new tag
-                    metadataRef.update("tags", FieldValue.arrayUnion(tagDto)).await()
-                }
-            } else {
-                // Create new metadata document with this tag
-                val newMetadata = EmailMetadataDto(
-                    tags = listOf(tagDto),
-                    isRead = false,
-                    isStarred = false
-                )
-                metadataRef.set(newMetadata).await()
-            }
-
+            metadataRef.update("tags", FieldValue.arrayUnion(tagDto)).await()
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -316,20 +296,7 @@ class EmailRepositoryImpl(
     override suspend fun markAsRead(emailId: String, isRead: Boolean): Result<Unit> {
         return try {
             val metadataRef = userEmailMetadataCollection().document(emailId)
-            val currentMetadata = metadataRef.get().await().toObject<EmailMetadataDto>()
-
-            if (currentMetadata != null) {
-                metadataRef.update("isRead", isRead).await()
-            } else {
-                // Create new metadata document
-                val newMetadata = EmailMetadataDto(
-                    tags = emptyList(),
-                    isRead = isRead,
-                    isStarred = false
-                )
-                metadataRef.set(newMetadata).await()
-            }
-
+            metadataRef.set(mapOf("isRead" to isRead), com.google.firebase.firestore.SetOptions.merge()).await()
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -341,20 +308,7 @@ class EmailRepositoryImpl(
     override suspend fun toggleStar(emailId: String, isStarred: Boolean): Result<Unit> {
         return try {
             val metadataRef = userEmailMetadataCollection().document(emailId)
-            val currentMetadata = metadataRef.get().await().toObject<EmailMetadataDto>()
-
-            if (currentMetadata != null) {
-                metadataRef.update("isStarred", isStarred).await()
-            } else {
-                // Create new metadata document
-                val newMetadata = EmailMetadataDto(
-                    tags = emptyList(),
-                    isRead = false,
-                    isStarred = isStarred
-                )
-                metadataRef.set(newMetadata).await()
-            }
-
+            metadataRef.set(mapOf("isStarred" to isStarred), com.google.firebase.firestore.SetOptions.merge()).await()
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -479,24 +433,13 @@ class EmailRepositoryImpl(
     override suspend fun softDeleteEmail(emailId: String): Result<Unit> {
         return try {
             val metadataRef = userEmailMetadataCollection().document(emailId)
-            val currentMetadata = metadataRef.get().await().toObject<EmailMetadataDto>()
-
-            if (currentMetadata != null) {
-                metadataRef.update(
-                    mapOf(
-                        "isDeleted" to true,
-                        "folderId" to TRASH_FOLDER_ID
-                    )
-                ).await()
-            } else {
-                // Create new metadata document with soft-delete flags
-                val newMetadata = EmailMetadataDto(
-                    folderId = TRASH_FOLDER_ID,
-                    isDeleted = true
-                )
-                metadataRef.set(newMetadata).await()
-            }
-
+            metadataRef.set(
+                mapOf(
+                    "isDeleted" to true,
+                    "folderId" to TRASH_FOLDER_ID
+                ),
+                com.google.firebase.firestore.SetOptions.merge()
+            ).await()
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e

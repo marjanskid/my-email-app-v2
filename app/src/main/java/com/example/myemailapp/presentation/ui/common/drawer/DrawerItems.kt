@@ -38,6 +38,12 @@ val emailsScreenDrawerItems = listOf(
         screen = Screen.Folders,
     ),
     NavDrawerItem(
+        title = "Contacts",
+        selectedIcon = Icons.Filled.Person,
+        unselectedIcon = Icons.Outlined.Person,
+        screen = Screen.Contacts,
+    ),
+    NavDrawerItem(
         title = "Test Data",
         selectedIcon = Icons.Filled.Science,
         unselectedIcon = Icons.Outlined.Science,

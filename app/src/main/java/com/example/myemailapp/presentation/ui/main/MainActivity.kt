@@ -28,6 +28,9 @@ import com.example.myemailapp.presentation.ui.folders.view.ViewFolderScreen
 import com.example.myemailapp.presentation.ui.login.LoginScreen
 import com.example.myemailapp.presentation.ui.profile.ProfileScreen
 import com.example.myemailapp.presentation.ui.testdata.TestDataScreen
+import com.example.myemailapp.presentation.ui.contacts.ContactsScreen
+import com.example.myemailapp.presentation.ui.contacts.ContactScreen
+import com.example.myemailapp.presentation.ui.contacts.CreateContactScreen
 import com.example.myemailapp.ui.theme.MyEmailAppTheme
 import com.google.firebase.FirebaseApp
 import org.koin.android.ext.android.inject
@@ -154,6 +157,22 @@ class MainActivity : ComponentActivity() {
                                 navController = navController,
                                 emailId = emailId
                             )
+                        }
+                        composable(
+                            route = Screen.Contacts.route,
+                        ) {
+                            ContactsScreen(navController = navController)
+                        }
+                        composable(
+                            route = Screen.Contact.route,
+                            arguments = listOf(navArgument("contactId") { type = NavType.StringType })
+                        ) {
+                            ContactScreen(navController = navController)
+                        }
+                        composable(
+                            route = Screen.CreateContact.route,
+                        ) {
+                            CreateContactScreen(navController = navController)
                         }
                     }
                 }
