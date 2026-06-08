@@ -3,22 +3,29 @@ package com.example.myemailapp.presentation.ui.emails
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myemailapp.data.repository.EmailRepository
+import com.example.myemailapp.data.repository.SettingsRepository
 import com.example.myemailapp.data.service.EmailStatusService
 import com.example.myemailapp.domain.model.EmailResult
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.domain.model.db.Email
+import com.example.myemailapp.domain.model.settings.RefreshInterval
+import com.example.myemailapp.domain.model.settings.SortOrder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class EmailsViewModel(
     private val emailStatusService: EmailStatusService,
-    private val emailRepository: EmailRepository
+    private val emailRepository: EmailRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EmailsState())
@@ -32,12 +39,38 @@ class EmailsViewModel(
     private var hasMoreEmails: Boolean = true
     private var isLoadingMore: Boolean = false
 
+    private var refreshJob: Job? = null
+
     init {
         viewModelScope.launch {
             emailStatusService.emailStatusEvents.collect { result ->
                 _emailStatusEvent.emit(result)
             }
         }
+
+        viewModelScope.launch {
+            settingsRepository.sortOrder.collect { sortOrder ->
+                _state.update { it.copy(sortOrder = sortOrder) }
+                applySortToCurrentEmails()
+            }
+        }
+
+        viewModelScope.launch {
+            settingsRepository.refreshInterval.collect { interval ->
+                refreshJob?.cancel()
+                if (interval != RefreshInterval.MANUAL) {
+                    refreshJob = viewModelScope.launch {
+                        while (isActive) {
+                            delay(interval.millis)
+                            if (!state.value.isRefreshing) {
+                                refreshEmails()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         loadEmails()
     }
 
@@ -152,17 +185,32 @@ class EmailsViewModel(
 
     fun getFilteredEmails(): List<Email> {
         val query = state.value.searchQuery.lowercase().trim()
-        if (query.isEmpty()) return state.value.emails
-
-        return state.value.emails.filter { email ->
-            email.subject.lowercase().contains(query) ||
-            email.content.lowercase().contains(query) ||
-            email.from.lowercase().contains(query) ||
-            email.to.lowercase().contains(query) ||
-            email.cc.lowercase().contains(query) ||
-            email.bcc.lowercase().contains(query) ||
-            email.tags.any { it.name.lowercase().contains(query) }
+        val filtered = if (query.isEmpty()) {
+            state.value.emails
+        } else {
+            state.value.emails.filter { email ->
+                email.subject.lowercase().contains(query) ||
+                email.content.lowercase().contains(query) ||
+                email.from.lowercase().contains(query) ||
+                email.to.lowercase().contains(query) ||
+                email.cc.lowercase().contains(query) ||
+                email.bcc.lowercase().contains(query) ||
+                email.tags.any { it.name.lowercase().contains(query) }
+            }
         }
+
+        return when (state.value.sortOrder) {
+            SortOrder.ASCENDING -> filtered.sortedBy { it.dateTime }
+            SortOrder.DESCENDING -> filtered.sortedByDescending { it.dateTime }
+        }
+    }
+
+    private fun applySortToCurrentEmails() {
+        val sortedEmails = when (state.value.sortOrder) {
+            SortOrder.ASCENDING -> state.value.emails.sortedBy { it.dateTime }
+            SortOrder.DESCENDING -> state.value.emails.sortedByDescending { it.dateTime }
+        }
+        _state.update { it.copy(emails = sortedEmails) }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -246,5 +294,7 @@ data class EmailsState(
     val hasMore: Boolean = true,
     val isLoadingMore: Boolean = false,
     // Pull-to-refresh state
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    // Settings
+    val sortOrder: SortOrder = SortOrder.DESCENDING
 )

@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myemailapp.data.repository.EmailRepository
 import com.example.myemailapp.data.repository.FoldersRepository
+import com.example.myemailapp.data.repository.SettingsRepository
 import com.example.myemailapp.data.service.FolderUpdateEvent
 import com.example.myemailapp.data.service.UpdateFolderStatusService
 import com.example.myemailapp.domain.model.Folder
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.domain.model.db.Email
+import com.example.myemailapp.domain.model.settings.SortOrder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +23,8 @@ class ViewFolderViewModel(
     savedStateHandle: SavedStateHandle,
     private val foldersRepository: FoldersRepository,
     private val emailRepository: EmailRepository,
-    private val updateFolderStatusService: UpdateFolderStatusService
+    private val updateFolderStatusService: UpdateFolderStatusService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val folderId: String = savedStateHandle.get<String>("folderId") ?: ""
@@ -32,6 +35,7 @@ class ViewFolderViewModel(
     init {
         loadFolderData()
         subscribeToFolderUpdates()
+        subscribeToSortOrderChanges()
     }
 
     private fun subscribeToFolderUpdates() {
@@ -47,6 +51,25 @@ class ViewFolderViewModel(
                     }
                 }
             }
+        }
+    }
+
+    private fun subscribeToSortOrderChanges() {
+        viewModelScope.launch {
+            settingsRepository.sortOrder.collect { sortOrder ->
+                _state.update { it.copy(sortOrder = sortOrder) }
+                applySortToCurrentEmails()
+            }
+        }
+    }
+
+    private fun applySortToCurrentEmails() {
+        _state.update { currentState ->
+            val sortedEmails = when (currentState.sortOrder) {
+                SortOrder.ASCENDING -> currentState.emails.sortedBy { it.dateTime }
+                SortOrder.DESCENDING -> currentState.emails.sortedByDescending { it.dateTime }
+            }
+            currentState.copy(emails = sortedEmails)
         }
     }
 
@@ -132,5 +155,6 @@ class ViewFolderViewModel(
 data class ViewFolderState(
     val processState: ProcessState = ProcessState.Initial,
     val folder: Folder? = null,
-    val emails: List<Email> = emptyList()
+    val emails: List<Email> = emptyList(),
+    val sortOrder: SortOrder = SortOrder.DESCENDING
 )
