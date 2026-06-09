@@ -69,4 +69,5 @@ dependencies {
     implementation(libs.bundles.firebase)
     implementation(libs.android.koin)
     implementation(libs.android.koin.compose)
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 }
