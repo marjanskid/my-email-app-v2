@@ -34,7 +34,7 @@ class LoginViewModel(
             val password = _state.value.password.trim()
 
             authRepository.login(email = email, password = password).fold(
-                onSuccess = { data ->
+                onSuccess = { _ ->
                     withContext(Dispatchers.Main) {
                         _state.update { previous ->
                             previous.copy(
@@ -44,7 +44,7 @@ class LoginViewModel(
                         }
                     }
                 },
-                onFailure = { failure ->
+                onFailure = { _ ->
                     withContext(Dispatchers.Main) {
                         _state.update { previous -> previous.copy(processState = ProcessState.Failure) }
                     }

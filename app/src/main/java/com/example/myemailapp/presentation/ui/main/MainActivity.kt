@@ -109,17 +109,24 @@ class MainActivity : ComponentActivity() {
                                     type = NavType.StringType
                                     nullable = true
                                     defaultValue = null
+                                },
+                                navArgument("draftEmailId") {
+                                    type = NavType.StringType
+                                    nullable = true
+                                    defaultValue = null
                                 }
                             )
                         ) { backStackEntry ->
                             val replyToEmailId = backStackEntry.arguments?.getString("replyToEmailId")
                             val replyAllToEmailId = backStackEntry.arguments?.getString("replyAllToEmailId")
                             val forwardEmailId = backStackEntry.arguments?.getString("forwardEmailId")
+                            val draftEmailId = backStackEntry.arguments?.getString("draftEmailId")
                             CreateEmailScreen(
                                 navController = navController,
                                 replyToEmailId = replyToEmailId,
                                 replyAllToEmailId = replyAllToEmailId,
-                                forwardEmailId = forwardEmailId
+                                forwardEmailId = forwardEmailId,
+                                draftEmailId = draftEmailId
                             )
                         }
                         composable(

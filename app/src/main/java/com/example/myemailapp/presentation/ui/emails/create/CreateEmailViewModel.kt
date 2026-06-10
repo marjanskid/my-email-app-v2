@@ -96,6 +96,11 @@ class CreateEmailViewModel(
     }
 
     fun sendEmail() {
+        if (_state.value.to.trim().isEmpty()) {
+            _state.update { it.copy(errorMessage = "Recipient (To) field is required.") }
+            return
+        }
+
         _state.update { previous -> previous.copy(processState = ProcessState.Loading) }
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -135,13 +140,16 @@ class CreateEmailViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             emailRepository.saveDraft(email = emailFromState()).fold(
-                onSuccess = { _ ->
+                onSuccess = { savedEmailId ->
                     emailStatusService.emitStatus(EmailResult.DraftSaved)
                     withContext(Dispatchers.Main) {
+                        val updatedEmail = emailFromState().copy(id = savedEmailId)
                         _state.update { previous ->
                             previous.copy(
                                 processState = ProcessState.Success,
-                                emailResult = EmailResult.DraftSaved
+                                emailResult = EmailResult.DraftSaved,
+                                updatedDraft = updatedEmail,
+                                emailId = savedEmailId
                             )
                         }
                     }
@@ -306,6 +314,47 @@ class CreateEmailViewModel(
         }
     }
 
+    fun initAsDraft(draftEmailId: String) {
+        _state.update { it.copy(processState = ProcessState.Loading) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            emailRepository.getEmailById(draftEmailId).fold(
+                onSuccess = { draftEmail ->
+                    // Convert draft attachments to display data
+                    val attachmentDisplayData = draftEmail.attachments.map { attachment ->
+                        createAttachmentDisplayData(attachment)
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        _state.update {
+                            it.copy(
+                                emailId = draftEmail.id,
+                                to = draftEmail.to,
+                                cc = draftEmail.cc,
+                                bcc = draftEmail.bcc,
+                                subject = draftEmail.subject,
+                                content = draftEmail.content,
+                                attachments = attachmentDisplayData,
+                                showCcBcc = draftEmail.cc.isNotEmpty() || draftEmail.bcc.isNotEmpty(),
+                                processState = ProcessState.Initial
+                            )
+                        }
+                    }
+                },
+                onFailure = {
+                    withContext(Dispatchers.Main) {
+                        _state.update {
+                            it.copy(
+                                processState = ProcessState.Failure,
+                                errorMessage = "Failed to load draft"
+                            )
+                        }
+                    }
+                }
+            )
+        }
+    }
+
     private fun createAttachmentDisplayData(attachment: Attachment): AttachmentDisplayData {
         val isImage = isImageMimeType(attachment.type)
         return AttachmentDisplayData(
@@ -330,7 +379,7 @@ class CreateEmailViewModel(
     }
 
     fun emailFromState(): Email {
-        return Email.toEmail(
+        val email = Email.toEmail(
             to = _state.value.to.trim(),
             cc = _state.value.cc.trim(),
             bcc = _state.value.bcc.trim(),
@@ -338,6 +387,11 @@ class CreateEmailViewModel(
             content = _state.value.content,
             attachments = _state.value.attachments.map { it.attachment }
         )
+        return if (_state.value.emailId.isNotEmpty()) {
+            email.copy(id = _state.value.emailId)
+        } else {
+            email
+        }
     }
 
 
@@ -359,6 +413,7 @@ class CreateEmailViewModel(
 }
 
 data class CreateEmailState(
+    val emailId: String = "",
     val to: String = "",
     val cc: String = "",
     val bcc: String = "",
@@ -371,5 +426,6 @@ data class CreateEmailState(
     val errorOccurred: Boolean = false,
     val processState: ProcessState = ProcessState.Initial,
     val errorMessage: String? = null,
-    val emailResult: EmailResult = EmailResult.None
+    val emailResult: EmailResult = EmailResult.None,
+    val updatedDraft: Email? = null
 )

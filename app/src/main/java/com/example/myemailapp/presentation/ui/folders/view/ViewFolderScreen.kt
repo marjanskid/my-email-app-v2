@@ -184,7 +184,11 @@ fun ViewFolderScreen(
                                         EmailListItem(
                                             email = email,
                                             onClick = {
-                                                navController.navigate(Screen.ViewEmail.createRoute(email.id))
+                                                if (email.folderId == "folder-drafts") {
+                                                    navController.navigate(Screen.CreateEmail.createRoute(draftEmailId = email.id))
+                                                } else {
+                                                    navController.navigate(Screen.ViewEmail.createRoute(email.id))
+                                                }
                                             },
                                             onStarClick = {
                                                 viewModel.toggleStar(email.id, email.isStarred)
