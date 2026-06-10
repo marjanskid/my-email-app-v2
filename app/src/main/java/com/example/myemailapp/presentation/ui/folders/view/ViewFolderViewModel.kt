@@ -135,11 +135,19 @@ class ViewFolderViewModel(
 
     fun updateEmailLocally(updatedEmail: Email) {
         _state.update { previous ->
-            previous.copy(
-                emails = previous.emails.map { email ->
-                    if (email.id == updatedEmail.id) updatedEmail else email
-                }
-            )
+            // If email was moved to a different folder (e.g., draft sent → moved to folder-sent),
+            // remove it from the current folder's view instead of updating it
+            if (updatedEmail.folderId != folderId) {
+                previous.copy(
+                    emails = previous.emails.filterNot { it.id == updatedEmail.id }
+                )
+            } else {
+                previous.copy(
+                    emails = previous.emails.map { email ->
+                        if (email.id == updatedEmail.id) updatedEmail else email
+                    }
+                )
+            }
         }
     }
 

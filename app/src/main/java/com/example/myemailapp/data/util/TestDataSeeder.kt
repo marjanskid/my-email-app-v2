@@ -38,6 +38,7 @@ class TestDataSeeder(
     private object Folders {
         const val INBOX = "folder-inbox"
         const val SENT = "folder-sent"
+        const val DRAFTS = "folder-drafts"
         const val WORK = "folder-work"
         const val PERSONAL = "folder-personal"
         const val SPAM = "folder-spam"
@@ -50,6 +51,7 @@ class TestDataSeeder(
     private val folders = listOf(
         FolderDef(Folders.INBOX, "Inbox"),
         FolderDef(Folders.SENT, "Sent"),
+        FolderDef(Folders.DRAFTS, "Drafts"),
         FolderDef(Folders.WORK, "Work"),
         FolderDef(Folders.PERSONAL, "Personal"),
         FolderDef(Folders.SPAM, "Spam"),

@@ -10,11 +10,12 @@ sealed class Screen(val route: String) {
     object Profile: Screen("profile-screen")
     object Settings: Screen("settings-screen")
     object Folders: Screen("folders-screen")
-    object CreateEmail: Screen("create-email-screen?replyToEmailId={replyToEmailId}&replyAllToEmailId={replyAllToEmailId}&forwardEmailId={forwardEmailId}") {
+    object CreateEmail: Screen("create-email-screen?replyToEmailId={replyToEmailId}&replyAllToEmailId={replyAllToEmailId}&forwardEmailId={forwardEmailId}&draftEmailId={draftEmailId}") {
         fun createRoute(
             replyToEmailId: String? = null,
             replyAllToEmailId: String? = null,
-            forwardEmailId: String? = null
+            forwardEmailId: String? = null,
+            draftEmailId: String? = null
         ): String {
             return buildString {
                 append("create-email-screen")
@@ -22,6 +23,7 @@ sealed class Screen(val route: String) {
                 replyToEmailId?.let { params.add("replyToEmailId=$it") }
                 replyAllToEmailId?.let { params.add("replyAllToEmailId=$it") }
                 forwardEmailId?.let { params.add("forwardEmailId=$it") }
+                draftEmailId?.let { params.add("draftEmailId=$it") }
                 if (params.isNotEmpty()) {
                     append("?")
                     append(params.joinToString("&"))

@@ -44,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.myemailapp.domain.model.Attachment
+import com.example.myemailapp.domain.model.EmailResult
 import com.example.myemailapp.domain.model.ProcessState
 import com.example.myemailapp.presentation.ui.emails.AttachmentViewModel
 import com.example.myemailapp.presentation.ui.common.LoadingView
@@ -61,6 +62,7 @@ fun CreateEmailScreen(
     replyToEmailId: String? = null,
     replyAllToEmailId: String? = null,
     forwardEmailId: String? = null,
+    draftEmailId: String? = null,
     viewModel: CreateEmailViewModel = koinViewModel(),
     attachmentViewModel: AttachmentViewModel = koinViewModel()
 ) {
@@ -103,10 +105,11 @@ fun CreateEmailScreen(
         viewModel.addAttachment(attachment)
     }
 
-    LaunchedEffect(replyToEmailId, replyAllToEmailId, forwardEmailId) {
+    LaunchedEffect(replyToEmailId, replyAllToEmailId, forwardEmailId, draftEmailId) {
         replyToEmailId?.let { viewModel.initAsReply(it) }
         replyAllToEmailId?.let { viewModel.initAsReplyAll(it) }
         forwardEmailId?.let { viewModel.initAsForward(it) }
+        draftEmailId?.let { viewModel.initAsDraft(it) }
     }
 
     LaunchedEffect(key1 = state.processState) {
@@ -120,6 +123,25 @@ fun CreateEmailScreen(
         }
 
         if (state.processState == ProcessState.Success) {
+            if (state.emailResult == EmailResult.DraftSaved && state.updatedDraft != null) {
+                navController.previousBackStackEntry?.savedStateHandle?.set("updated_email", state.updatedDraft)
+            } else if (state.emailResult == EmailResult.Sent && state.emailId.isNotEmpty()) {
+                // For sent emails, pass back with sent status so ViewFolderScreen removes it if it was a draft
+                val sentEmail = com.example.myemailapp.domain.model.db.Email(
+                    id = state.emailId,
+                    from = state.to,
+                    to = state.to,
+                    cc = state.cc,
+                    bcc = state.bcc,
+                    subject = state.subject,
+                    content = state.content,
+                    attachments = state.attachments.map { it.attachment },
+                    dateTime = java.time.Instant.now(),
+                    status = "sent",
+                    folderId = "folder-sent"
+                )
+                navController.previousBackStackEntry?.savedStateHandle?.set("updated_email", sentEmail)
+            }
             viewModel.resetEmailResult()
             navController.popBackStack()
             return@LaunchedEffect

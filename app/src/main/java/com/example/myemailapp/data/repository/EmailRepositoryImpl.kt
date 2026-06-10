@@ -30,6 +30,7 @@ class EmailRepositoryImpl(
     companion object {
         private const val TRASH_FOLDER_ID = "folder-trash"
         private const val SENT_FOLDER_ID = "folder-sent"
+        private const val DRAFTS_FOLDER_ID = "folder-drafts"
     }
 
     private val currentUserEmail: String
@@ -87,20 +88,22 @@ class EmailRepositoryImpl(
                 .set(firestoreData)
                 .await()
 
-            // Create metadata for sender so email appears in Sent folder
-            if (status == EmailStatus.sent) {
-                val senderMetadata = EmailMetadataDto(
-                    tags = emptyList(),
-                    isRead = true,
-                    isStarred = false,
-                    folderId = SENT_FOLDER_ID,
-                    isDeleted = false
-                )
-                userEmailMetadataCollection()
-                    .document(emailId)
-                    .set(senderMetadata)
-                    .await()
+            // Create or update metadata for sender
+            val folderId = when (status) {
+                EmailStatus.sent -> SENT_FOLDER_ID
+                EmailStatus.draft -> DRAFTS_FOLDER_ID
             }
+            val senderMetadata = EmailMetadataDto(
+                tags = emptyList(),
+                isRead = true,
+                isStarred = false,
+                folderId = folderId,
+                isDeleted = false
+            )
+            userEmailMetadataCollection()
+                .document(emailId)
+                .set(senderMetadata)
+                .await()
 
             Result.success(emailId)
         } catch (e: CancellationException) {
