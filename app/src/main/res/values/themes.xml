@@ -2,4 +2,12 @@
 <resources>
 
     <style name="Theme.MyEmailApp" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.MyEmailApp.Starting" parent="Theme.SplashScreen">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="windowSplashScreenBackground">#5B3F8A</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_app_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.MyEmailApp</item>
+    </style>
 </resources>
